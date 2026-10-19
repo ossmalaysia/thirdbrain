@@ -1,14 +1,18 @@
-# Weekly package checks. Security updates come as soon as an advisory is published.
+# Weekly package checks. Version updates wait 14 days after a release (supply-chain safety: a bad release is
+# usually found and pulled within days). Security updates come as soon as an advisory is published.
 version: 2
 updates:
   - package-ecosystem: "bun"
     directory: "/app"
     schedule: { interval: "weekly" }
+    cooldown: { default-days: 14 }
     open-pull-requests-limit: 5
   - package-ecosystem: "bun"
     directory: "/desktop"
     schedule: { interval: "weekly" }
+    cooldown: { default-days: 14 }
     open-pull-requests-limit: 5
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule: { interval: "weekly" }
+    cooldown: { default-days: 14 }
