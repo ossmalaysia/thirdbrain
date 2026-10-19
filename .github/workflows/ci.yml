@@ -1,0 +1,30 @@
+# Tests for every pull request and every push to main. Required by the main branch ruleset.
+# Actions are pinned to full commit SHAs: the OSS Malaysia organisation requires it (Dependabot updates the pins).
+# Bun comes from npm because only GitHub-owned actions are allowed in this organisation.
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned by Dependabot later)
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: "22" }
+      - run: npm install -g bun@1.4.2
+      - name: App tests
+        working-directory: app
+        run: |
+          bun install --frozen-lockfile
+          bun test --timeout 60000
+      - name: Desktop tests
+        working-directory: desktop
+        env: { ELECTRON_SKIP_BINARY_DOWNLOAD: "1" }
+        run: |
+          bun install --frozen-lockfile
+          bun test
