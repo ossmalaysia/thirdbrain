@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runVaultBackup, type Exec } from "../src/backup.ts";
 
+
 // Commit identity for the fixture repos (inherited by the git processes the backup starts); no signing prompts.
 Object.assign(process.env, { GIT_AUTHOR_NAME: "Fixture", GIT_AUTHOR_EMAIL: "fixture@example.test", GIT_COMMITTER_NAME: "Fixture",
   GIT_COMMITTER_EMAIL: "fixture@example.test", GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "commit.gpgsign", GIT_CONFIG_VALUE_0: "false" });
@@ -12,6 +13,8 @@ const git = (args: string[], cwd: string) => {
   const p = Bun.spawnSync(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
   return { code: p.exitCode, out: p.stdout.toString().trim() };
 };
+/** A repo of its own with a local identity: a clean machine (CI) has no global git user, and the backup commits. */
+const initRepo = (cwd: string) => { git(["init", "-q", "-b", "main"], cwd); git(["config", "user.name", "Test"], cwd); git(["config", "user.email", "test@example.com"], cwd); };
 const now = new Date(2026, 9, 17, 9, 5);
 
 test("backup commits the vault (never .env, ignored files or the local-only repo), pushes it, and commits the local-only repo locally", async () => {
@@ -19,7 +22,7 @@ test("backup commits the vault (never .env, ignored files or the local-only repo
   const root = mkdtempSync(join(tmpdir(), "tb-backup-")), vault = join(root, "vault"), remote = join(root, "remote.git");
   git(["init", "-q", "--bare", "-b", "main", remote], root);
   mkdirSync(join(vault, "_setup"), { recursive: true });
-  git(["init", "-q", "-b", "main"], vault);
+  initRepo(vault);
   git(["remote", "add", "origin", remote], vault);
   writeFileSync(join(vault, ".gitignore"), "ignored.txt\n");
   writeFileSync(join(vault, "note.md"), "# Note\n");
@@ -27,7 +30,7 @@ test("backup commits the vault (never .env, ignored files or the local-only repo
   writeFileSync(join(vault, "_setup", ".env"), "SECRET=1\n");
   writeFileSync(join(vault, ".env"), "SECRET=1\n");
   mkdirSync(join(vault, "life"));
-  git(["init", "-q", "-b", "main"], join(vault, "life"));
+  initRepo(join(vault, "life"));
   writeFileSync(join(vault, "life", "private.md"), "private\n");
 
   expect(await runVaultBackup({ vault, push: true, localOnlyRepos: ["life"], now })).toBe(0);
