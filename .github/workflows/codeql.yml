@@ -1,10 +1,12 @@
 # Code scanning. A private repository needs GitHub Advanced Security for this, so the job runs only when the
+# Actions are pinned to full commit SHAs: the OSS Malaysia organisation requires it (Dependabot updates the pins).
 # repository is public (it is skipped, not failed, while it is private).
 name: CodeQL
 on:
   push: { branches: [main] }
   pull_request: { branches: [main] }
   schedule: [{ cron: "23 4 * * 1" }]
+  workflow_dispatch:
 permissions:
   contents: read
   security-events: write
@@ -13,7 +15,7 @@ jobs:
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: github/codeql-action/init@ce5e7eeac396d720fe2d802714996c8ce561e311 # v3
         with: { languages: javascript-typescript }
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@ce5e7eeac396d720fe2d802714996c8ce561e311 # v3
