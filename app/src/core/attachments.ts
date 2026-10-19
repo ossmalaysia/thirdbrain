@@ -4,6 +4,7 @@
 import { unzipSync, strFromU8 } from "fflate";
 import { extractText as pdfText, getDocumentProxy } from "unpdf";
 import { findSecret } from "./secrets.ts";
+import { decodeEntities, stripTags } from "./html-text.ts";
 
 export const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024, MAX_ATTACHMENT_TEXT = 20_000, MAX_TEXT_PER_ITEM = 40_000;
 
@@ -16,29 +17,31 @@ export interface AttachmentInfo {
 }
 
 const ext = (name: string) => name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
-const decodeXml = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
 const tidy = (s: string) => s.replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+
+// All markup below becomes plain text for notes (not HTML): core/html-text.ts removes every tag and decodes
+// entities once, after the tags are gone.
 
 /** Text runs from Office XML: paragraphs (w:p / a:p) become lines, runs (w:t / a:t) are joined. */
 function officeXmlText(xml: string, run: "w:t" | "a:t", para: "w:p" | "a:p"): string {
-  return decodeXml(xml.replace(new RegExp(`</${para}>`, "g"), "\n").replace(new RegExp(`<${run}[^>]*>([^<]*)</${run}>`, "g"), "$1\u0001")
-    .replace(/<[^>]+>/g, "").replace(/\u0001/g, ""));
+  return decodeEntities(stripTags(xml.replace(new RegExp(`</${para}>`, "g"), "\n").replace(new RegExp(`<${run}[^>]*>([^<]*)</${run}>`, "g"), "$1\u0001"))
+    .replace(/\u0001/g, ""));
 }
 
 function xlsxText(files: Record<string, Uint8Array>): string {
   const shared = [...strFromU8(files["xl/sharedStrings.xml"] ?? new Uint8Array()).matchAll(/<si>([\s\S]*?)<\/si>/g)]
-    .map(m => decodeXml(m[1].replace(/<[^>]+>/g, "")));
+    .map(m => decodeEntities(stripTags(m[1])));
   const sheets = Object.keys(files).filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f)).sort((a, b) => Number(a.match(/\d+/)![0]) - Number(b.match(/\d+/)![0]));
   return sheets.map((f, i) => `Sheet ${i + 1}:\n` + [...strFromU8(files[f]).matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)].map(row =>
     [...row[1].matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)].map(c => { // cells may have no attributes at all
       const value = c[2]?.match(/<v>([^<]*)<\/v>/)?.[1] ?? c[2]?.match(/<t[^>]*>([^<]*)<\/t>/)?.[1] ?? "";
-      return /t="s"/.test(c[1]) ? shared[Number(value)] ?? "" : decodeXml(value);
+      return /t="s"/.test(c[1]) ? shared[Number(value)] ?? "" : decodeEntities(value);
     }).filter(Boolean).join(" | ")).filter(Boolean).join("\n")).join("\n\n");
 }
 
-/** Visible text of HTML/XML (styles and scripts dropped); plain text passes through. */
-const markupText = (s: string) => /<[a-z!/][^>]*>/i.test(s)
-  ? decodeXml(s.replace(/<(style|script)\b[\s\S]*?<\/\1>/gi, " ").replace(/<br\s*\/?>|<\/(p|div|li|tr|h\d)>/gi, "\n").replace(/<[^>]+>/g, " ")).replace(/&nbsp;/g, " ")
+/** Visible text of HTML/XML as plain text (styles and scripts dropped); plain text passes through. */
+const markupText =(s: string) => /<[a-z!/][^>]*>/i.test(s)
+  ? decodeEntities(stripTags(s.replace(/<br\s*\/?>|<\/(p|div|li|tr|h\d)>/gi, "\n"), " "))
   : s;
 
 /** Text that is already available (Claude.ai upload text, documents Claude wrote): same cleanup, secret check and cap as files. */

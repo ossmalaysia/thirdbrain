@@ -3,8 +3,8 @@ import { branch, chatDocuments, chatItems, enrichChatThread, messageText, pullCl
 import { renderThreadNote } from "../src/core/render.ts";
 import { buildPrompt } from "../src/core/extract.ts";
 import type { Knowledge, Thread } from "../src/types.ts";
-import { browserApi, ClaudeAuthError, ClaudeBlockedError, jsGet, signedIn } from "../src/claude-web/session.ts";
-import { findBrowser, launchArgs } from "../src/claude-web/cdp.ts";
+import { browserApi, claudeUrl, ClaudeAuthError, ClaudeBlockedError, FETCH_IN_TAB, signedIn } from "../src/claude-web/session.ts";
+import { findBrowser, launchArgs, onOrigin, pickTab } from "../src/claude-web/cdp.ts";
 
 const ME = { name: "Aisyah Rahman", email: "aisyah@example.com" };
 const msg = (uuid: string, parent: string | undefined, sender: string, text: string, at = "2026-10-15T10:00:00Z", index = 0) =>
@@ -202,7 +202,7 @@ test("account: carried on items, tagged in the note and named in the prompt", ()
 });
 
 test("in-tab requests: host guard, signed out, Cloudflare challenge", async () => {
-  expect(jsGet("https://claude.ai/api/organizations")).toContain('if(location.host!=="claude.ai")');
+  expect(FETCH_IN_TAB).toContain('if (location.host !== "claude.ai")');
   const api = (r: object) => browserApi(9333, async () => r as never);
   await expect(api({ status: 0, host: "login.microsoftonline.com" }).get("/api/x")).rejects.toBeInstanceOf(ClaudeAuthError);
   await expect(api({ status: 403, body: "<title>Just a moment...</title>" }).get("/api/x")).rejects.toBeInstanceOf(ClaudeBlockedError);
@@ -217,4 +217,29 @@ test("browser launch: headed with automation markers off and its own profile (cl
   expect(args).toEqual(expect.arrayContaining(["--remote-debugging-port=9333", "--user-data-dir=C:\\p", "--disable-blink-features=AutomationControlled"]));
   expect(args.some(a => a.includes("headless"))).toBe(false);
   expect(findBrowser({})).toBeNull();
+});
+
+test("in-tab requests: the URL is an argument of a fixed function, never code", async () => {
+  const calls: { fn: string; args: unknown[] }[] = [];
+  const api = browserApi(9333, async (_port, fn, args) => { calls.push({ fn, args }); return { status: 200, body: "[]" } as never; });
+  await api.get('/api/x?q=");alert(1);//');
+  expect(calls[0].fn).toBe(FETCH_IN_TAB);
+  expect(calls[0].args).toEqual(["https://claude.ai/api/x?q=%22);alert(1);//"]);
+  // A path that would leave claude.ai is refused before anything runs in the tab.
+  for (const bad of ["@evil.example/x", ".evil.example/x", ":443@evil.example/", "evil.example"]) {
+    await expect(api.get(bad)).rejects.toThrow("not a Claude.ai path");
+  }
+  expect(calls.length).toBe(1);
+  expect(claudeUrl("/api/organizations")).toBe("https://claude.ai/api/organizations");
+});
+
+test("claude.ai tab: exact origin, look-alike hosts are not it", () => {
+  for (const url of ["https://claude.ai", "https://claude.ai/", "https://claude.ai/new", "https://CLAUDE.ai/chat/1"]) expect(onOrigin(url, "https://claude.ai")).toBe(true);
+  for (const url of ["https://claude.ai.evil.com/", "https://evilclaude.ai/", "https://claude.ai:8443/", "http://claude.ai/",
+    "https://claude.ai@evil.com/", "javascript:location='https://claude.ai'", "not a url", ""]) expect(onOrigin(url, "https://claude.ai")).toBe(false);
+  const page = (id: string, url: string) => ({ id, type: "page", url });
+  expect(pickTab([page("a", "https://claude.ai.evil.com/"), page("b", "https://evilclaude.ai/"), page("c", "https://claude.ai/new")], "https://claude.ai")?.id).toBe("c");
+  expect(pickTab([page("a", "https://claude.ai.evil.com/")], "https://claude.ai")).toBeUndefined();
+  expect(pickTab([page("a", "https://login.microsoftonline.com/x"), page("b", "https://claude.ai/")], "https://claude.ai")?.id).toBe("b");
+  expect(pickTab([{ id: "w", type: "service_worker", url: "https://claude.ai/sw.js" }], "https://claude.ai")).toBeUndefined();
 });

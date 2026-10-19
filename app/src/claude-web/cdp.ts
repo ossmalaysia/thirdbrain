@@ -1,5 +1,5 @@
 // Minimal Chrome DevTools Protocol client: launch a real Edge/Chrome with its own profile, find the claude.ai
-// tab, evaluate JavaScript in it, and minimise/restore its window. Replaces chromedp from
+// tab, call fixed JavaScript functions in it, and minimise/restore its window. Replaces chromedp from
 // ossmalaysia/claude-sync (MIT, Anchor Sprint), whose browser flags and approach this follows.
 import { existsSync } from "node:fs";
 
@@ -24,7 +24,7 @@ export function launchArgs(profileDir: string, port: number, url: string): strin
     "--window-size=1100,800", url];
 }
 
-interface Target { id: string; type: string; url: string; webSocketDebuggerUrl?: string }
+export interface Target { id: string; type: string; url: string; webSocketDebuggerUrl?: string }
 
 /** One WebSocket connection to a DevTools target, with request/response matching. */
 export class CdpConnection {
@@ -67,19 +67,31 @@ export async function browserAlive(port: number): Promise<boolean> {
   try { return (await devtools(port, "/json/version")).ok; } catch { return false; }
 }
 
+/** True when `url` is on exactly `origin` (scheme, host name and port). Look-alikes such as
+ *  https://claude.ai.evil.com or https://evilclaude.ai are not; neither is anything that does not parse. */
+export function onOrigin(url: string, origin: string): boolean {
+  try { return new URL(url).origin === new URL(origin).origin; } catch { return false; }
+}
+
+/** The tab to use: one on `origin`, else a sign-in page, else none (pure, for tests). */
+export function pickTab(targets: Target[], origin: string): Target | undefined {
+  const pages = targets.filter(t => t.type === "page");
+  return pages.find(t => onOrigin(t.url, origin)) ?? pages.find(t => /login|auth|sso|accounts\./i.test(t.url));
+}
+
 /** The claude.ai tab, opening one if the user closed it. */
 export async function claudeTab(port: number, origin = "https://claude.ai"): Promise<Target> {
-  const targets = await (await devtools(port, "/json/list")).json() as Target[];
-  const pages = targets.filter(t => t.type === "page");
-  const tab = pages.find(t => t.url.startsWith(origin)) ?? pages.find(t => /login|auth|sso|accounts\./i.test(t.url));
+  const tab = pickTab(await (await devtools(port, "/json/list")).json() as Target[], origin);
   if (tab) return tab;
   const created = await devtools(port, `/json/new?${encodeURIComponent(origin + "/")}`, { method: "PUT" });
   return await created.json() as Target;
 }
 
-/** Evaluates an expression (awaiting promises) in the tab and returns its JSON value. The minimised tab is marked
- *  active and focused first; if it still hangs (a frozen page never settles its fetches) it is reloaded once. */
-export async function evaluate<T>(port: number, expression: string, timeoutMs = 60_000): Promise<T> {
+/** Calls `fn` (the source of a function, a fixed constant: never built from data) in the tab with `args` as
+ *  its arguments, awaiting a promise, and returns its JSON value. The arguments travel as DevTools values
+ *  (Runtime.callFunctionOn), so no data is ever turned into code. The minimised tab is marked active and
+ *  focused first; if the call still hangs (a frozen page never settles its fetches) the tab is reloaded once. */
+export async function callInTab<T>(port: number, fn: string, args: unknown[] = [], timeoutMs = 60_000): Promise<T> {
   const tab = await claudeTab(port);
   if (!tab.webSocketDebuggerUrl) throw new Error("the claude.ai tab is not debuggable");
   const conn = await CdpConnection.open(tab.webSocketDebuggerUrl);
@@ -87,7 +99,13 @@ export async function evaluate<T>(port: number, expression: string, timeoutMs = 
     await conn.send("Page.setWebLifecycleState", { state: "active" }, 5000).catch(() => {});
     await conn.send("Emulation.setFocusEmulationEnabled", { enabled: true }, 5000).catch(() => {});
   };
-  const run = () => conn.send<{ result: { value: T }; exceptionDetails?: { text?: string } }>("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }, timeoutMs);
+  const run = async () => {
+    // The page's global object is the `this` of the call; asked again after a reload (the old one is gone).
+    const global = await conn.send<{ result: { objectId?: string } }>("Runtime.evaluate", { expression: "globalThis" }, timeoutMs);
+    if (!global.result.objectId) throw new Error("the claude.ai tab has no page to run in");
+    return conn.send<{ result: { value: T }; exceptionDetails?: { text?: string } }>("Runtime.callFunctionOn",
+      { objectId: global.result.objectId, functionDeclaration: fn, arguments: args.map(value => ({ value })), awaitPromise: true, returnByValue: true }, timeoutMs);
+  };
   try {
     await wake();
     let r;

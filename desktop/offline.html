@@ -27,11 +27,28 @@
     <button id="retry" type="button" autofocus>Retry</button>
   </main>
   <script>
-    // The main process passes the portal address as ?url=. Retry simply loads it again;
-    // if it still fails, the main process brings this page back.
-    const portal = new URLSearchParams(location.search).get("url") || "http://127.0.0.1:58432/";
-    document.getElementById("url").textContent = portal;
-    document.getElementById("retry").addEventListener("click", () => location.replace(portal));
+    // The main process passes the portal address as ?url=. Retry loads the portal again; if it still fails,
+    // the main process brings this page back. The query is not trusted: Retry only ever goes to a portal on
+    // this computer (http or https on 127.0.0.1, localhost or [::1], with a port number), and the address is
+    // rebuilt from fixed parts, so a javascript:, file: or remote address can never be opened from here.
+    // Any other address is only shown (as text); Retry is then off and the app has to be restarted.
+    const DEFAULT_PORTAL = "http://127.0.0.1:58432/";
+    const LOCAL_HOSTS = { "127.0.0.1": "127.0.0.1", "localhost": "localhost", "[::1]": "[::1]" };
+    function retryAddress(raw) {
+      let u;
+      try { u = new URL(raw || DEFAULT_PORTAL); } catch { return null; }
+      const scheme = u.protocol === "https:" ? "https://" : u.protocol === "http:" ? "http://" : null;
+      const host = Object.prototype.hasOwnProperty.call(LOCAL_HOSTS, u.hostname) ? LOCAL_HOSTS[u.hostname] : null;
+      const port = u.port === "" ? (scheme === "https://" ? 443 : 80) : (/^\d{1,5}$/.test(u.port) ? Number(u.port) : NaN);
+      if (!scheme || !host || !(port >= 1 && port <= 65535) || u.username || u.password) return null;
+      return scheme + host + ":" + port + "/";
+    }
+    const asked = new URLSearchParams(location.search).get("url");
+    const portal = retryAddress(asked);
+    const retry = document.getElementById("retry");
+    document.getElementById("url").textContent = portal || String(asked);
+    if (portal) retry.addEventListener("click", () => location.replace(portal));
+    else { retry.disabled = true; retry.title = "Retry works only for a portal on this computer. Restart the app."; }
   </script>
 </body>
 </html>

@@ -2,16 +2,28 @@
 // carries the user's own cookies and a genuine browser fingerprint (plain HTTP gets a Cloudflare challenge).
 // Ported from ossmalaysia/claude-sync internal/browser (MIT, Anchor Sprint): the hostGuard and the
 // signed-in check are the same.
-import { evaluate } from "./cdp.ts";
+import { callInTab } from "./cdp.ts";
 
 export const CLAUDE_ORIGIN = "https://claude.ai";
 
-/** As claude-sync's hostGuard: never fetch while the tab is elsewhere (e.g. an SSO sign-in page). */
-const HOST_GUARD = `if(location.host!=="claude.ai"){return {status:0,host:location.host}}`;
+/** The request that runs inside the signed-in tab. A fixed function: the URL arrives as its argument
+ *  (Runtime.callFunctionOn), never as code. As claude-sync's hostGuard, it never fetches while the tab is
+ *  elsewhere (e.g. an SSO sign-in page). */
+export const FETCH_IN_TAB = `async function (url) {
+  if (location.host !== "claude.ai") return { status: 0, host: location.host };
+  const r = await fetch(url, { credentials: "include", signal: AbortSignal.timeout(45000) });
+  return { status: r.status, body: await r.text() };
+}`;
 
-export function jsGet(url: string): string {
-  return `(async()=>{${HOST_GUARD}const r=await fetch(${JSON.stringify(url)},{credentials:"include",signal:AbortSignal.timeout(45000)});return {status:r.status,body:await r.text()}})()`;
+/** The absolute URL of a Claude.ai API path. Throws unless it stays on the Claude.ai origin. */
+export function claudeUrl(path: string): string {
+  let url: URL;
+  try { url = new URL(CLAUDE_ORIGIN + path); } catch { throw new Error(`not a Claude.ai path: ${path}`); }
+  if (url.origin !== CLAUDE_ORIGIN) throw new Error(`not a Claude.ai path: ${path}`);
+  return url.href;
 }
+
+type InTab = <T>(port: number, fn: string, args: unknown[]) => Promise<T>;
 
 export class ClaudeAuthError extends Error {}
 export class ClaudeBlockedError extends Error {}
@@ -19,10 +31,10 @@ export class ClaudeBlockedError extends Error {}
 export interface ClaudeApi { get: <T = any>(path: string) => Promise<T> }
 
 /** A ClaudeApi that runs requests in the browser listening on `port`. */
-export function browserApi(port: number, run: <T>(port: number, js: string) => Promise<T> = evaluate): ClaudeApi {
+export function browserApi(port: number, run: InTab = callInTab): ClaudeApi {
   return {
     async get<T>(path: string): Promise<T> {
-      const r = await run<{ status: number; body?: string; host?: string }>(port, jsGet(CLAUDE_ORIGIN + path));
+      const r = await run<{ status: number; body?: string; host?: string }>(port, FETCH_IN_TAB, [claudeUrl(path)]);
       if (r.host) throw new ClaudeAuthError(`Claude.ai is not signed in (the tab is on ${r.host}). Use Reconnect Claude.ai in the portal.`);
       if (r.status === 401 || r.status === 403) {
         if (/challenge|cf-chl|Just a moment/i.test(r.body ?? "")) throw new ClaudeBlockedError("Cloudflare is challenging the Claude.ai browser. Open it from the portal and complete the check.");

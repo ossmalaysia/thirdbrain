@@ -5,6 +5,7 @@
 import type { Config } from "../state.ts";
 import type { Item, Person, Source } from "../types.ts";
 import { graphGet, graphGetText, TEAMS_SCOPES } from "./graph.ts";
+import { decodeEntities, stripTags } from "../core/html-text.ts";
 
 export const FEEDS = { chats: "teams:chats", channels: "teams:channels", meetings: "meetings" } as const;
 export const isTeamsFeed = (feed: string) => Object.values(FEEDS).includes(feed as never);
@@ -20,24 +21,27 @@ export function teamsDeps(cfg: Config, me: TeamsDeps["me"]): TeamsDeps {
   return { get: (url, h) => graphGet(cfg, url, h, TEAMS_SCOPES), getText: (url, h) => graphGetText(cfg, url, h, TEAMS_SCOPES), me };
 }
 
-/** Teams message HTML -> readable text (mentions, line breaks and links kept as text). */
+/** Teams message HTML -> readable plain text for a note (mentions, line breaks and links kept as text).
+ *  The result is plain text, not HTML: core/html-text.ts removes every tag and decodes entities once. */
 export function htmlToText(html: string): string {
-  return html
+  const marked = html
     .replace(/<(br|\/p|\/div|\/li|\/h\d)[^>]*>/gi, "\n").replace(/<li[^>]*>/gi, "- ")
     .replace(/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gi, (_, href, label) => label && !href.includes(label) ? `${label} (${href})` : href)
-    .replace(/<attachment[^>]*><\/attachment>/gi, "[attachment]").replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-    .replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    .replace(/<attachment[^>]*><\/attachment>/gi, "[attachment]");
+  return decodeEntities(stripTags(marked)).replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
+
+/** A WebVTT cue timing line: "00:00:01.000 --> 00:00:03.000" (hours optional, cue settings may follow). */
+const VTT_TIMING = /^(?:\d+:)?\d{2}:\d{2}[.,]\d{3}\s+-->\s+(?:\d+:)?\d{2}:\d{2}[.,]\d{3}/;
 
 /** WebVTT transcript -> "Speaker: words" lines, merging consecutive cues from the same speaker. */
 export function vttToText(vtt: string): string {
   const lines: string[] = [];
   for (const block of vtt.replace(/\r\n/g, "\n").split(/\n\n+/)) {
-    const cue = block.split("\n").filter(l => l && !/^WEBVTT|^NOTE|-->|^\d+$/.test(l.trim())).join(" ").trim();
+    const cue = block.split("\n").map(l => l.trim()).filter(l => l && !/^WEBVTT|^NOTE|^\d+$/.test(l) && !VTT_TIMING.test(l)).join(" ").trim();
     if (!cue) continue;
     const m = cue.match(/^<v ([^>]+)>(.*?)(?:<\/v>)?$/s);
-    const speaker = m?.[1].trim(), words = (m ? m[2] : cue).replace(/<[^>]+>/g, "").trim();
+    const speaker = m?.[1].trim(), words = decodeEntities(stripTags(m ? m[2] : cue)).trim();
     if (!words) continue;
     const last = lines[lines.length - 1];
     if (speaker && last?.startsWith(`${speaker}: `)) lines[lines.length - 1] = `${last} ${words}`;
