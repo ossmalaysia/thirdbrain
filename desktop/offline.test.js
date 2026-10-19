@@ -4,7 +4,10 @@ const path = require("node:path");
 
 // Runs the inline script of offline.html against a stub page, as the window would load it with ?url=.
 const html = fs.readFileSync(path.join(__dirname, "offline.html"), "utf8");
-const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+// The page has exactly one inline script, written as a plain "<script>" tag; cut it out by position.
+const start = html.indexOf("<script>") + "<script>".length;
+const script = html.slice(start, html.indexOf("</script>", start));
+if (start < "<script>".length || !script.includes("retryAddress")) throw new Error("offline.html inline script not found");
 
 function load(query) {
   const replaced = [];
