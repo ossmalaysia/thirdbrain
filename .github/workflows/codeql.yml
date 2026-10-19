@@ -1,0 +1,19 @@
+# Code scanning. A private repository needs GitHub Advanced Security for this, so the job runs only when the
+# repository is public (it is skipped, not failed, while it is private).
+name: CodeQL
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+  schedule: [{ cron: "23 4 * * 1" }]
+permissions:
+  contents: read
+  security-events: write
+jobs:
+  analyze:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with: { languages: javascript-typescript }
+      - uses: github/codeql-action/analyze@v3

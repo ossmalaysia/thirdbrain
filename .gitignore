@@ -1,0 +1,13 @@
+node_modules/
+.env
+*.env
+.brain-mailsync/
+.third-brain/
+dry-run/
+scratch/
+.playwright-mcp/
+*.log
+.DS_Store
+Thumbs.db
+dist/
+out/

@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="portal-token" content="__CONTROL_TOKEN__">
+<title>Connectors · Third Brain</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#172226" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Third Brain">
+<link rel="stylesheet" href="/style.css">
+<script type="module" src="/portal.js"></script>
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar" id="sidebar" aria-label="Menu">
+  <a class="brand" href="#connectors"><img src="/favicon.svg" alt="" width="30" height="30"><span data-bind="productName">Third Brain</span></a>
+  <nav class="nav" aria-label="Portal">
+    <a href="#connectors" data-route="connectors">Connectors</a>
+    <a href="#notes" data-route="notes">Notes</a>
+    <a href="#runs" data-route="runs">Sync runs <span class="count" data-bind="runCount"></span></a>
+    <a href="#entities" data-route="entities">Entities</a>
+    <a href="#dream" data-route="dream">Dream</a>
+    <a href="#usage" data-route="usage">Usage</a>
+    <a href="#backup" data-route="backup">Vault backup</a>
+    <a href="#remote" data-route="remote">Remote access</a>
+    <a href="#settings" data-route="settings">Settings <span class="badge" data-bind="updateBadge" data-hide-empty hidden></span></a>
+  </nav>
+  <p class="sidebar-note"><span class="status" data-bind="live">Connecting</span>Runs on this computer only. Mail and settings stay here.</p>
+</aside>
+<div class="nav-backdrop" id="nav-backdrop" hidden></div>
+<nav class="tabbar" aria-label="Main">
+  <a href="#connectors" data-route="connectors">Connectors</a>
+  <a href="#notes" data-route="notes">Notes</a>
+  <a href="#runs" data-route="runs">Sync runs</a>
+  <a href="#entities" data-route="entities">Entities</a>
+  <button type="button" class="tabbar-more" id="nav-more" aria-expanded="false" aria-controls="sidebar">More</button>
+</nav>
+
+<main>
+  <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+
+  <section data-view="connectors" aria-labelledby="connectors-title">
+    <header class="page-head"><h1 id="connectors-title">Connectors</h1>
+      <p class="lede">Sources that feed your brain. Each one turns raw activity into notes in your vault.</p></header>
+    <div class="panel sync-strip">
+      <p><strong class="status" data-bind="state">Checking the collector</strong> <span class="muted small" data-bind="detail"></span></p>
+      <span class="muted small">Next run <strong data-bind="nextRun">—</strong></span>
+      <button class="btn" data-action="sync" disabled>Sync now</button>
+    </div>
+    <ul class="conn-grid" id="connector-grid" aria-label="Connectors"></ul>
+  </section>
+
+  <section data-view="add" aria-labelledby="add-title" hidden>
+    <a class="back" href="#connectors">Connectors</a>
+    <header class="page-head"><h1 id="add-title">Add connector</h1>
+      <p class="lede">Choose a source to feed your brain. Each one signs in once, then syncs every 15 minutes.</p></header>
+    <ul class="catalog" id="catalog" aria-label="Available connectors"></ul>
+  </section>
+
+  <section data-view="connector" aria-labelledby="connector-title" hidden>
+    <a class="back" href="#connectors">Connectors</a>
+    <header class="page-head">
+      <div class="detail-head">
+        <span class="source-icon" id="connector-mark" aria-hidden="true"></span>
+        <div><h1 id="connector-title">Connector</h1><p class="muted" id="connector-account"></p></div>
+        <span class="badge" id="connector-pill"></span>
+      </div>
+      <p class="lede" id="connector-about"></p>
+    </header>
+    <div class="toolbar" id="connector-actions"></div>
+    <p class="alert" id="connector-error" hidden></p>
+    <p class="callout" data-tone="warn" id="connector-wait" role="status" hidden></p>
+    <dl class="panel facts" id="connector-facts"></dl>
+
+    <div data-connector="outlook" hidden>
+      <ol class="panel pipeline" aria-label="How email becomes notes">
+        <li><span>Emails processed</span><strong data-bind="processed">—</strong><small>Unique messages seen</small></li>
+        <li><span>Waiting for Codex</span><strong data-bind="queued">—</strong><small>Queued for note extraction</small></li>
+        <li><span>Brain notes</span><strong data-bind="notes">—</strong><small>From every connector</small></li>
+        <li><span>GBrain index</span><strong data-bind="index">—</strong><small>Search refresh after each run</small></li>
+      </ol>
+      <div class="grid">
+        <section class="panel card" aria-labelledby="report-title">
+          <div class="card-head"><h2 id="report-title">Last run</h2><span class="badge" data-bind="runResult">No run yet</span></div>
+          <p class="muted small" data-bind="runTime"></p>
+          <dl class="rows">
+            <div><dt>Emails fetched</dt><dd data-bind="pulled">—</dd></div>
+            <div><dt>Useful emails kept</dt><dd data-bind="kept">—</dd></div>
+            <div><dt>Duplicates skipped</dt><dd data-bind="duplicates">—</dd></div>
+            <div><dt>Notes written or updated</dt><dd data-bind="written">—</dd></div>
+            <div><dt>Threads with nothing to save</dt><dd data-bind="skipped">—</dd></div>
+            <div><dt>…of which skipped by the decision model</dt><dd data-bind="triageSkipped">—</dd></div>
+            <div><dt>Threads blocked by the secret check</dt><dd data-bind="blocked">—</dd></div>
+          </dl>
+          <p class="small"><strong>Filtered out:</strong> <span class="muted" data-bind="filtered">—</span></p>
+          <p class="alert" data-bind="runError" data-hide-empty hidden></p>
+        </section>
+        <section class="panel card" aria-labelledby="settings-title">
+          <h2 id="settings-title">Sync settings</h2>
+          <form id="settings">
+            <div class="field"><label for="days">Email history, in days</label><input id="days" name="days" type="number" min="1" step="1" required>
+              <p class="hint">Raise this to collect older email. Messages already processed are skipped.</p></div>
+            <div class="field"><label for="threads">Threads per run</label><input id="threads" name="threads" type="number" min="1" step="1" required>
+              <p class="hint">How many threads Codex turns into notes per run, across all connectors. The rest wait for the next run.</p></div>
+            <div class="row"><span class="muted small" data-bind="applied"></span><button class="btn" type="submit" data-action="save" disabled>Save settings</button></div>
+          </form>
+          <div class="row divider"><div><strong>Automatic sync</strong><p class="muted small" data-bind="scheduleLabel"></p></div><button class="btn btn-quiet" data-action="schedule" disabled>Pause</button></div>
+          <p class="muted small">Notes written by <span data-bind="extractor">Codex</span>. <a href="#settings">Change</a></p>
+        </section>
+      </div>
+    </div>
+
+    <section class="panel card" data-connector="gmail" aria-labelledby="gmail-scope-title" hidden>
+      <div class="card-head"><h2 id="gmail-scope-title">What to include</h2><button class="btn btn-quiet laptop-only" type="button" id="gmail-count">Count</button></div>
+      <p class="remote-only" id="gmail-scope-summary"></p>
+      <p class="hint remote-only">Change this on the laptop.</p>
+      <form id="gmail-scope-form" class="laptop-only gmail-scope">
+        <p class="hint" id="gmail-scope-counts" role="status"></p>
+        <fieldset class="choices window-choices" id="gmail-scope-options"><legend class="sr-only">Kinds of mail</legend></fieldset>
+        <details class="disclosure" id="gmail-scope-labels-box"><summary id="gmail-scope-labels-title">Labels</summary>
+          <p class="hint">Every message with a chosen label is included, in any tab.</p>
+          <ul class="list" id="gmail-scope-labels"></ul></details>
+        <p class="callout" id="gmail-scope-estimate" role="status"></p>
+        <p class="hint" id="gmail-scope-writer"></p>
+        <p class="callout" data-tone="warn" id="gmail-scope-change" hidden></p>
+        <div class="actions end"><button class="btn" type="submit" id="gmail-scope-save" disabled>Save</button></div>
+      </form>
+    </section>
+
+    <section class="panel card" data-connector="claude" aria-labelledby="accounts-title" hidden>
+      <h2 id="accounts-title">Accounts</h2>
+      <ul class="list" id="claude-accounts"></ul>
+      <div id="claude-add"></div>
+      <p class="hint">Each account gets its own Microsoft Edge window (one claude.ai login per window). Sign in there once; it then stays minimised in the background. Closing it pauses that account's sync until the portal reopens it.</p>
+    </section>
+  </section>
+
+  <section data-view="notes" aria-labelledby="notes-title" hidden>
+    <header class="page-head"><h1 id="notes-title">Notes</h1>
+      <p class="lede">Everything the connector has written into your vault, by where it came from. Newest activity first.</p></header>
+    <div class="tabs" role="tablist" aria-label="Note source" id="note-tabs"></div>
+    <form class="toolbar align-end" id="note-filters" role="search" aria-label="Filter notes">
+      <label class="toolbar-grow"><span class="sr-only">Search notes</span>
+        <input id="note-search" type="search" placeholder="Search titles and summaries" autocomplete="off" maxlength="200"></label>
+      <fieldset class="notes-range">
+        <legend class="sr-only">Last activity</legend>
+        <div class="chips" id="note-presets"></div>
+        <div class="range-inputs">
+          <label><span>From</span><input id="note-from" type="date"></label>
+          <label><span>To</span><input id="note-to" type="date"></label>
+        </div>
+      </fieldset>
+    </form>
+    <p class="result-count" id="note-count" aria-live="polite"></p>
+    <ol class="panel notes-list" id="notes-list"></ol>
+    <nav class="pager" id="note-pager" aria-label="Note pages" hidden></nav>
+  </section>
+
+  <section data-view="runs" aria-labelledby="runs-title" hidden>
+    <header class="page-head"><h1 id="runs-title">Sync runs</h1>
+      <p class="lede">Every run started by the schedule or by Sync now. The latest 20 are listed; totals survive restarts.</p></header>
+    <dl class="totals">
+      <div><dt>Succeeded</dt><dd data-bind="succeeded">0</dd></div>
+      <div><dt>Failed or interrupted</dt><dd data-bind="failed">0</dd></div>
+      <div><dt>Skipped</dt><dd data-bind="skippedRuns">0</dd></div>
+    </dl>
+    <div class="panel table-wrap" id="runs-table" hidden><table class="data-table stacked"><thead id="runs-head"></thead><tbody id="runs-body"></tbody></table></div>
+    <div class="panel empty empty-hero" id="runs-empty">
+      <img src="/empty-state.png" alt="" width="360" height="240">
+      <h2>No runs yet</h2>
+      <p class="muted">The next scheduled run will appear here. To start one now, use Sync now on the <a href="#connectors">Connectors</a> page.</p>
+    </div>
+  </section>
+
+  <section data-view="entities" aria-labelledby="entities-title" hidden>
+    <header class="page-head"><h1 id="entities-title">Entities</h1>
+      <p class="lede">The people, companies, projects and topics your notes name. Each one has a page in <code>inbox/entities/</code> that lists its notes, newest first.</p></header>
+    <div class="tabs" role="tablist" aria-label="Entities view" id="entity-mode">
+      <button type="button" class="tab" role="tab" data-mode="browse" aria-selected="true">Browse</button>
+      <button type="button" class="tab laptop-only" role="tab" data-mode="review" aria-selected="false">Review duplicates <span class="count" id="dups-count"></span></button>
+    </div>
+
+    <div class="stack" id="entity-browse">
+      <div class="tabs" role="tablist" aria-label="Entity type" id="entity-tabs"></div>
+      <form class="toolbar" id="entity-filters" role="search" aria-label="Filter entities">
+        <label class="toolbar-grow"><span class="sr-only">Search names</span><input id="entity-search" type="search" placeholder="Search names and aliases" autocomplete="off" maxlength="200"></label>
+        <label class="field-inline">Sort <select id="entity-sort"><option value="notes">Most notes</option><option value="last">Newest note</option><option value="name">Name</option></select></label>
+        <label class="check" id="entity-group-wrap"><input type="checkbox" id="entity-group"> Group by organisation</label>
+      </form>
+      <p class="result-count" id="entity-count" aria-live="polite"></p>
+      <div class="panel table-wrap"><table class="data-table stacked"><thead><tr><th>Name</th><th>Details</th><th class="num">Notes</th><th>Last note</th></tr></thead><tbody id="entity-body"></tbody></table></div>
+      <nav class="pager" id="entity-pager" aria-label="Entity pages" hidden></nav>
+    </div>
+
+    <div id="entity-review" class="stack laptop-only" hidden>
+      <div class="toolbar">
+        <p class="toolbar-grow" id="dups-summary">Checking…</p>
+        <button class="btn" type="button" id="dups-judge">Check with the model now</button>
+      </div>
+      <details class="disclosure">
+        <summary>How this works</summary>
+        <p class="muted small">Each card is one page that stays, with the names that may be the same. Click a name to see its notes first. <strong>Merge</strong> moves the notes into the page that stays and keeps the other name as an alias, so that spelling links there from now on. <strong>Not the same</strong> stops the suggestion.</p>
+        <p class="muted small">Each night the decision model checks new pairs, and the note writer LLM decides the pairs it is not sure about. 80% sure or more: merged. 10% or less: marked not the same. Only the pairs between come to you. Names that differ only by spaces or dashes merge by themselves. Every automatic merge can be undone below.</p>
+      </details>
+      <p class="callout" id="dups-apply" role="status" hidden></p>
+      <div class="stack" id="dups-list"></div>
+      <div class="panel empty" id="dups-empty" hidden><p class="muted">No possible duplicates. All decided.</p></div>
+      <nav class="pager" id="dups-pager" aria-label="Duplicate pages" hidden></nav>
+      <details class="panel disclosure" id="dups-decided" hidden>
+        <summary>Decided automatically <span class="count" id="dups-decided-count"></span></summary>
+        <p class="muted small">Merges by the model and by the same-name rule, and pairs the model marked not the same. Undo a wrong merge: the other page comes back and the pair is not suggested again.</p>
+        <ul class="list" id="dups-decided-list"></ul>
+      </details>
+    </div>
+  </section>
+
+  <section data-view="dream" aria-labelledby="dream-page-title" hidden>
+    <header class="page-head"><h1 id="dream-page-title">Dream</h1>
+      <p class="lede">The nightly upkeep that links your notes. Turn it on or off and choose its start time here.</p></header>
+    <article class="panel status-card" aria-labelledby="dream-title">
+      <header class="status-card-head">
+        <span class="source-icon source-git" data-icon="moon" aria-hidden="true">D</span>
+        <div><h2 id="dream-title">Dream</h2><p class="muted small" data-bind="dreamNext">—</p></div>
+        <div class="actions laptop-only"><button class="btn" type="button" data-action="dreamRun" disabled>Dream now</button></div>
+      </header>
+      <p class="status-line"><strong class="status" data-bind="dreamState">Checking</strong></p>
+      <div class="card">
+      <p class="muted small">Each night the brain links itself. Third Brain adds related notes (similar meaning, from the local Ollama model, no AI tokens) and topic pages for tags on 5 or more notes. Then GBrain runs its own commands: links and timeline, mention links, search embeddings and an orphan count. Claude.ai and local agents get no answer from GBrain for a few minutes near the end. GBrain's full <code>gbrain dream</code> cycle also writes AI summaries; that part stays off (it needs a chat model key and costs tokens).</p>
+      <div class="table-wrap"><table class="data-table stacked"><thead><tr><th>Step (last dream)</th><th>Result</th><th>Time</th><th>Detail</th></tr></thead><tbody id="dream-steps"></tbody></table></div>
+      <h3 class="small">Recent dreams</h3>
+      <div class="table-wrap"><table class="data-table stacked"><thead><tr><th>Started</th><th>Result</th><th>Time</th><th>Detail</th></tr></thead><tbody id="dream-history"></tbody></table></div>
+      <form id="dream" class="laptop-only">
+        <div class="field"><label class="check"><input type="checkbox" name="enabled"> Dream every night</label></div>
+        <div class="field"><label for="dream-hour">Start time</label><select id="dream-hour" name="hour"><option value="0">00:00</option><option value="1">01:00</option><option value="2">02:00</option><option value="3">03:00</option><option value="4">04:00</option><option value="5">05:00</option><option value="6">06:00</option><option value="7">07:00</option><option value="8">08:00</option><option value="9">09:00</option><option value="10">10:00</option><option value="11">11:00</option><option value="12">12:00</option><option value="13">13:00</option><option value="14">14:00</option><option value="15">15:00</option><option value="16">16:00</option><option value="17">17:00</option><option value="18">18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option><option value="23">23:00</option></select></div>
+        <div class="row"><span class="muted small">When the laptop is off at that time, Dream runs after it starts.</span><button class="btn" type="submit">Save Dream settings</button></div>
+      </form>
+      </div>
+    </article>
+  </section>
+
+  <section data-view="usage" aria-labelledby="usage-title" hidden>
+    <header class="page-head"><h1 id="usage-title">Usage</h1>
+      <p class="lede">Tokens the note writer used to summarise your conversations, from the sync logs, and what that costs. Spend on an API key is estimated unless the provider reported it.</p></header>
+    <div class="chips usage-range" id="usage-range" role="group" aria-label="Time range"></div>
+    <p class="alert" id="usage-error" hidden></p>
+    <div class="stack stack-l" id="usage-body" aria-live="polite">
+      <dl class="totals" id="usage-totals"></dl>
+      <p class="panel usage-projection" id="usage-projection"></p>
+      <section class="panel card" aria-labelledby="usage-providers-title">
+        <h2 id="usage-providers-title">By note writer</h2>
+        <div class="table-wrap"><table class="data-table stacked"><thead><tr><th scope="col">Provider and model</th><th scope="col" class="num">Conversations</th><th scope="col" class="num">Tokens in</th><th scope="col" class="num">Tokens out</th><th scope="col" class="num">Per conversation</th><th scope="col" class="num">Spend</th></tr></thead><tbody id="usage-providers"></tbody></table></div>
+      </section>
+      <section class="panel card" aria-labelledby="usage-days-title">
+        <div class="card-head"><h2 id="usage-days-title">Tokens per day</h2><span class="muted small" id="usage-peak"></span></div>
+        <div class="usage-chart" id="usage-chart"></div>
+        <details class="disclosure usage-days-table"><summary>Show as a table</summary>
+          <div class="table-wrap"><table class="data-table stacked"><thead><tr><th scope="col">Day</th><th scope="col" class="num">Tokens</th><th scope="col">Details</th></tr></thead><tbody id="usage-days"></tbody></table></div></details>
+      </section>
+      <div class="grid">
+        <section class="panel card" aria-labelledby="usage-sources-title">
+          <h2 id="usage-sources-title">By source</h2>
+          <div class="table-wrap"><table class="data-table stacked"><thead><tr><th scope="col">Source</th><th scope="col" class="num">Conversations</th><th scope="col" class="num">Tokens in</th><th scope="col" class="num">Tokens out</th></tr></thead><tbody id="usage-sources"></tbody></table></div>
+          <p class="hint" id="usage-sources-note"></p>
+        </section>
+        <form id="usage-prices" class="panel card" aria-labelledby="usage-prices-title">
+          <h2 id="usage-prices-title">Prices</h2>
+          <p class="hint" id="usage-prices-note"></p>
+          <div class="price-rows" id="usage-price-rows"></div>
+          <div class="row"><span class="muted small">Codex is priced as the API would charge (API-equivalent).</span><button class="btn" type="submit">Save prices</button></div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section data-view="backup" aria-labelledby="backup-title" hidden>
+    <header class="page-head"><h1 id="backup-title">Vault backup</h1>
+      <p class="lede">Commits everything in your vault to Git and pushes it to your private GitHub repository, so nothing is lost if this laptop is.</p></header>
+
+    <article class="panel status-card" aria-labelledby="repo-title">
+      <header class="status-card-head">
+        <span class="source-icon source-git" data-icon="branch" aria-hidden="true">G</span>
+        <div><h2 id="repo-title">Vault repository</h2><p class="muted small" data-bind="backupRemotes">Private GitHub repository</p></div>
+        <div class="actions"><button class="btn btn-quiet" data-action="backupSchedule" disabled>Pause</button><button class="btn" data-action="backupRun" disabled>Back up now</button></div>
+      </header>
+      <p class="status-line"><strong class="status" data-bind="backupState">Checking backups</strong><span class="muted" data-bind="backupDetail"></span></p>
+      <dl class="facts">
+        <div><dt>Last backup</dt><dd data-bind="backupLast">—</dd></div>
+        <div><dt>Next backup</dt><dd data-bind="backupNext">—</dd></div>
+        <div><dt>Latest commit</dt><dd data-bind="backupLastCommit">—</dd></div>
+        <div><dt>Waiting to commit</dt><dd data-bind="backupUncommitted">—</dd></div>
+        <div><dt>Waiting to push</dt><dd data-bind="backupUnpushed">—</dd></div>
+      </dl>
+    </article>
+
+    <div class="grid">
+      <form id="backup" class="panel card" aria-labelledby="backup-settings-title">
+        <h2 id="backup-settings-title">Backup settings</h2>
+        <div class="field"><label for="interval">How often to back up</label><select id="interval" name="interval"></select>
+          <p class="hint">More often means less to lose; each backup with changes adds one commit.</p></div>
+        <div class="field"><label class="check"><input id="push" name="push" type="checkbox"> Push to GitHub after each commit</label>
+          <p class="hint">Turn off to keep commits on this computer only, for example on a metered connection.</p></div>
+        <div class="row"><span class="muted small">Applies from the next backup.</span><button class="btn" type="submit" data-action="backupSave" disabled>Save backup settings</button></div>
+      </form>
+      <section class="panel card" aria-labelledby="backup-scope-title">
+        <h2 id="backup-scope-title">What gets backed up</h2>
+        <ul class="plain">
+          <li>Every note and setup file in the vault, except what <code>.gitignore</code> excludes. <code>.env</code> files are never committed.</li>
+          <li>Email notes are also committed by the mail sync after each run, so they reach Git sooner.</li>
+          <li>Local-only repositories inside the vault (by default <code>life/</code>; <code>backup.localOnlyRepos</code> in config.json) are committed on this computer only and never pushed.</li>
+        </ul>
+      </section>
+    </div>
+  </section>
+
+  <section data-view="remote" class="settings-page" aria-labelledby="remote-title" hidden>
+    <header class="page-head"><h1 id="remote-title">Remote access</h1>
+      <p class="lede">Choose who can reach your brain. Claude Code and Codex on this laptop always can; Claude.ai and ChatGPT need a tunnel.</p></header>
+
+    <article class="panel status-card" aria-labelledby="remote-status-title">
+      <header class="status-card-head">
+        <span class="source-icon source-git" data-icon="globe" aria-hidden="true">R</span>
+        <div><h2 id="remote-status-title">Connector address</h2><p class="muted small" data-bind="remoteUrl">Off</p></div>
+        <div class="actions"><button class="btn btn-quiet" type="button" data-action="remoteCopy" disabled>Copy address</button></div>
+      </header>
+      <p class="status-line"><strong class="status" data-bind="remoteState">Checking</strong><span class="muted" data-bind="remoteNote" data-hide-empty></span></p>
+      <dl class="facts">
+        <div><dt>GBrain server</dt><dd><span class="status" data-bind="gbrainState">Checking</span></dd></div>
+        <div><dt>Address for this laptop</dt><dd data-bind="remoteLocalUrl">—</dd></div>
+      </dl>
+    </article>
+
+    <div class="grid">
+      <form id="remote" class="panel card" aria-labelledby="remote-mode-title">
+        <h2 id="remote-mode-title">Who can reach your brain</h2>
+        <fieldset class="choices">
+          <legend class="sr-only">Remote access mode</legend>
+          <label class="choice"><input type="radio" name="mode" value="local"><span><strong>Local only</strong><small>This laptop only. Nothing is exposed to the internet.</small></span></label>
+          <label class="choice"><input type="radio" name="mode" value="quick"><span><strong>Quick tunnel</strong><small>Random Cloudflare address, no domain needed. It changes whenever the tunnel restarts.</small></span></label>
+          <label class="choice"><input type="radio" name="mode" value="named"><span><strong>Named tunnel</strong><small>Your own domain through Cloudflare. Fixed address; needs a tunnel token.</small></span></label>
+        </fieldset>
+        <div class="field" data-panel="named">
+          <label for="tunnel-hostname">Public hostname</label><input class="key" id="tunnel-hostname" name="hostname" placeholder="brain.example.com" autocomplete="off" spellcheck="false">
+          <p class="hint">The hostname you routed to <code>http://127.0.0.1:58432</code> (this portal) in the Cloudflare tunnel. The portal passes MCP requests on to GBrain.</p>
+          <p><strong class="status" data-bind="tunnelTokenState">No token saved</strong></p>
+          <label for="tunnel-token">Tunnel token</label><input class="key" id="tunnel-token" name="token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste to save or replace">
+          <p class="hint">From Cloudflare: Zero Trust → Networks → Tunnels → your tunnel → install command. Stored encrypted on this computer and never shown again.</p>
+        </div>
+        <div class="row"><span class="muted small">Applies immediately.</span><button class="btn" type="submit" data-action="remoteSave" disabled>Apply</button></div>
+      </form>
+      <section class="panel card" aria-labelledby="devices-title">
+        <div class="card-head"><h2 id="devices-title">Other devices</h2><span class="badge" data-bind="devices">—</span></div>
+        <p class="hint">Open this portal from your phone or another computer at <strong data-bind="portalPublicUrl">Off</strong>. Each device signs in once with a link created here; sessions last 30 days.</p>
+        <div class="row laptop-only"><button class="btn btn-quiet" type="button" data-action="signOutDevices" disabled>Sign out all devices</button><button class="btn" type="button" data-action="deviceLink" disabled>Create sign-in link</button></div>
+        <form id="device-link" class="field laptop-only" hidden>
+          <label for="device-link-value">One-time sign-in link (expires in 10 minutes)</label>
+          <input id="device-link-value" name="link" class="key" readonly>
+          <div class="row"><span class="muted small">Send it to yourself only. Anyone who opens it first is signed in.</span><button class="btn btn-quiet" type="button" data-action="copyDeviceLink">Copy link</button></div>
+        </form>
+      </section>
+    </div>
+    <div class="grid">
+      <section class="panel card laptop-only" aria-labelledby="ai-connectors-title">
+        <h2 id="ai-connectors-title">Claude.ai and ChatGPT</h2>
+        <p class="hint">When you add your brain as a connector in Claude.ai or ChatGPT, GBrain asks you, the owner, to approve that connection. Sign in to GBrain's admin screen first, in the same browser, then add the connector there.</p>
+        <div class="row"><span class="muted small">Opens a one-time sign-in, valid 5 minutes.</span><button class="btn" type="button" data-action="gbrainAdmin">Sign in to GBrain admin</button></div>
+      </section>
+      <section class="panel card" aria-labelledby="remote-log-title">
+        <h2 id="remote-log-title">Tunnel activity</h2>
+        <p class="hint">The latest lines from Cloudflare's tunnel program, for troubleshooting.</p>
+        <pre class="log" data-bind="remoteLog" data-hide-empty hidden></pre>
+      </section>
+    </div>
+  </section>
+
+  <section data-view="settings" class="settings-page" aria-labelledby="settings-page-title" hidden>
+    <header class="page-head"><h1 id="settings-page-title">Settings</h1>
+      <p class="lede">Keep Third Brain up to date, and choose the AI that reads each email thread and writes the note. The thread's text is sent to the provider you choose.</p></header>
+
+    <article class="panel status-card" aria-labelledby="updates-title">
+      <header class="status-card-head">
+        <span class="source-icon source-git" data-icon="update" aria-hidden="true">U</span>
+        <div><h2 id="updates-title">Updates</h2><p class="muted small" data-bind="updateCurrent">Third Brain</p></div>
+        <div class="actions laptop-only"><button class="btn btn-quiet" type="button" data-action="updateCheck" disabled>Check now</button><button class="btn" type="button" data-action="updateApply" id="update-apply" hidden disabled>Update now</button></div>
+      </header>
+      <p class="status-line"><strong class="status" data-bind="updateState">Checking</strong><span class="muted" data-bind="updateDetail" data-hide-empty></span></p>
+      <dl class="facts">
+        <div><dt>Latest release</dt><dd data-bind="updateLatest">—</dd></div>
+        <div><dt>Last checked</dt><dd data-bind="updateChecked">—</dd></div>
+        <div id="update-links" hidden><dt>New version</dt><dd class="actions"><a id="update-notes-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Release notes</a> <a id="update-installer-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Download installer</a></dd></div>
+      </dl>
+      <div class="card" id="update-notes" hidden>
+        <details class="disclosure"><summary id="update-notes-title">What is new</summary><pre class="log" id="update-notes-text"></pre></details>
+        <p class="hint remote-only">Update from the laptop: open the portal there and choose Update now.</p>
+      </div>
+    </article>
+
+    <div class="grid">
+      <form id="ai" class="panel card" aria-labelledby="ai-title">
+        <h2 id="ai-title">Note extraction</h2>
+        <fieldset class="choices">
+          <legend class="sr-only">AI provider</legend>
+          <label class="choice"><input type="radio" name="provider" value="codex"><span><strong>ChatGPT subscription</strong><small>Your ChatGPT plan, signed in here. No per-email cost; limited by your plan's usage allowance. Experimental: uses ChatGPT's private Codex connection.</small></span></label>
+          <label class="choice"><input type="radio" name="provider" value="openai"><span><strong>OpenAI API</strong><small>Your OpenAI API key. Billed per token on your OpenAI account.</small></span></label>
+          <label class="choice"><input type="radio" name="provider" value="anthropic"><span><strong>Claude API</strong><small>Your Claude API key. Billed per token on your Anthropic account.</small></span></label>
+        </fieldset>
+        <div class="field">
+          <label for="model_codex" data-panel="codex">ChatGPT model</label><input class="model" id="model_codex" name="model_codex" data-panel="codex" list="chatgpt-models"><datalist id="chatgpt-models"></datalist>
+          <label for="model_openai" data-panel="openai">OpenAI model</label><input class="model" id="model_openai" name="model_openai" data-panel="openai">
+          <label for="model_anthropic" data-panel="anthropic">Claude model</label><input class="model" id="model_anthropic" name="model_anthropic" data-panel="anthropic">
+          <p class="hint">Leave blank for the default shown. Test connection checks the saved settings.</p>
+        </div>
+        <div class="row"><button class="btn btn-quiet" type="button" data-action="aiTest" disabled>Test connection</button><button class="btn" type="submit" data-action="aiSave" disabled>Save extraction settings</button></div>
+      </form>
+
+      <section class="panel card" aria-labelledby="access-title">
+        <h2 id="access-title">Sign-in and keys</h2>
+        <div data-panel="codex" class="access">
+          <p><strong class="status" data-bind="aiCodexState">Checking sign-in</strong></p>
+          <p class="hint">Sign in with the ChatGPT account that has your plan. The portal stores the sign-in encrypted on this computer, outside the vault, and renews it automatically.</p>
+          <a id="chatgpt-login-link" class="small" href="#" target="_blank" rel="noopener noreferrer" hidden>Sign-in page didn't open? Open it here.</a>
+          <div class="row"><button class="btn btn-quiet" type="button" data-action="chatgptSignOut" disabled>Sign out</button><button class="btn" type="button" data-action="chatgptLogin" disabled>Sign in with ChatGPT</button></div>
+        </div>
+        <form id="key-openai" data-panel="openai" class="access">
+          <p><strong class="status" data-bind="aiOpenaiKey">No key saved</strong></p>
+          <label for="openai-key">OpenAI API key</label><input class="key" id="openai-key" name="key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…" required>
+          <p class="hint">Stored only on this computer, outside the vault, and never shown again.</p>
+          <div class="row"><button class="btn btn-quiet" type="button" data-action="keyRemoveOpenai" disabled>Remove key</button><button class="btn" type="submit" data-action="keySaveOpenai" disabled>Save key</button></div>
+        </form>
+        <form id="key-anthropic" data-panel="anthropic" class="access">
+          <p><strong class="status" data-bind="aiAnthropicKey">No key saved</strong></p>
+          <label for="anthropic-key">Claude API key</label><input class="key" id="anthropic-key" name="key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" required>
+          <p class="hint">Stored only on this computer, outside the vault, and never shown again. If Claude declines a thread, it is retried on Anthropic's recommended fallback model.</p>
+          <div class="row"><button class="btn btn-quiet" type="button" data-action="keyRemoveAnthropic" disabled>Remove key</button><button class="btn" type="submit" data-action="keySaveAnthropic" disabled>Save key</button></div>
+        </form>
+      </section>
+    </div>
+
+    <section class="panel card decision-setup" aria-labelledby="decision-title">
+      <div class="card-head"><h2 id="decision-title">Decision model</h2><span class="badge" data-bind="decisionState">Off</span></div>
+      <p class="hint">A fast model for yes/no questions. When TypeSafe Jev is selected and its key is saved, Jev checks each <strong>new</strong> conversation before the note writer: if Jev is sure that the conversation is not worth keeping (P &lt; 0.15) or is a personal matter (P ≥ 0.85), the sync skips it and the note writer does not run. All other conversations, and every update to an existing note, go to the note writer as before. Jev does not write notes.</p>
+      <ol class="setup-steps">
+        <li class="panel card card-s card-inset">
+          <form id="decision">
+            <h3>1. Choose the provider</h3>
+            <fieldset class="choices">
+              <legend class="sr-only">Decision provider</legend>
+              <label class="choice"><input type="radio" name="decisionProvider" value="off"><span><strong>Off</strong><small>The note writer makes every decision (today's behaviour).</small></span></label>
+              <label class="choice"><input type="radio" name="decisionProvider" value="typesafe"><span><strong>TypeSafe Jev</strong><small>System One model: typed answers with probabilities. Billed by TypeSafe. The text of each new conversation (up to 12,000 characters) is sent to TypeSafe (US).</small></span></label>
+            </fieldset>
+            <div class="field"><label for="decision-model">Model</label><input class="model" id="decision-model" name="decision_model" placeholder="jev-latest" autocomplete="off" spellcheck="false">
+              <p class="hint">Leave blank for jev-latest.</p></div>
+            <div class="actions"><button class="btn" type="submit" data-action="decisionSave" disabled>Save provider</button></div>
+          </form>
+        </li>
+        <li class="panel card card-s card-inset">
+          <form id="key-typesafe">
+            <h3>2. Save the API key</h3>
+            <p><strong class="status" data-bind="decisionKey">No key saved</strong></p>
+            <label for="typesafe-key">TypeSafe API key</label><input class="key" id="typesafe-key" name="key" type="password" autocomplete="off" spellcheck="false" required>
+            <p class="hint">Get a key in the <a href="https://console.typesafe.ai/keys" target="_blank" rel="noopener noreferrer">TypeSafe console</a>. The key stays on this computer, outside the vault, and the portal never shows it again.</p>
+            <div class="actions"><button class="btn btn-quiet" type="button" data-action="keyRemoveTypesafe" disabled>Remove key</button><button class="btn" type="submit" data-action="keySaveTypesafe" disabled>Save key</button></div>
+          </form>
+        </li>
+        <li class="panel card card-s card-inset">
+          <h3>3. Test the connection</h3>
+          <p class="status" data-bind="decisionTest">Not tested yet.</p>
+          <p class="hint">Sends one fixed test question (a sample receipt). No data from your vault is sent.</p>
+          <div class="actions"><button class="btn" type="button" data-action="decisionTest" disabled>Test connection</button></div>
+        </li>
+      </ol>
+    </section>
+  </section>
+</main>
+</div>
+<dialog id="note-dialog" class="panel dialog" aria-labelledby="note-title">
+  <header class="dialog-head"><div><h2 id="note-title">Note</h2><p class="muted small" id="note-path"></p></div>
+    <div class="actions"><a class="btn btn-quiet" id="note-open" href="#">Open in Obsidian</a><button class="btn" id="note-close" type="button">Close</button></div></header>
+  <div id="note-body" class="dialog-body markdown"></div>
+</dialog>
+<dialog id="entity-dialog" class="panel dialog" aria-labelledby="entity-dialog-title">
+  <header class="dialog-head"><div><h2 id="entity-dialog-title">Entity</h2><p class="muted small" id="entity-dialog-sub"></p></div>
+    <div class="actions"><a class="btn btn-quiet" id="entity-open" href="#">Open in Obsidian</a><button class="btn" id="entity-close" type="button">Close</button></div></header>
+  <ol class="list dialog-list" id="entity-notes"></ol>
+</dialog>
+<dialog id="window-dialog" class="panel dialog dialog-narrow" aria-labelledby="window-title" aria-describedby="window-lede">
+  <form id="window-form" class="dialog-form" method="dialog">
+    <header class="window-head"><h2 id="window-title">How far back?</h2><p class="muted small" id="window-lede"></p></header>
+    <fieldset class="choices window-choices" id="window-choices"><legend class="sr-only">History window</legend></fieldset>
+    <p class="callout" id="window-writer"></p>
+    <p class="callout" data-tone="warn" id="window-change" role="status" hidden></p>
+    <ul class="window-notes" id="window-notes"></ul>
+    <div class="actions end"><button class="btn btn-quiet" type="button" id="window-cancel">Cancel</button><button class="btn" type="submit" id="window-confirm">Confirm</button></div>
+  </form>
+</dialog>
+<dialog id="gmail-dialog" class="panel dialog dialog-narrow" aria-labelledby="gmail-title" aria-describedby="gmail-lede">
+  <form id="gmail-form" class="dialog-form" autocomplete="off" novalidate>
+    <header class="window-head"><h2 id="gmail-title">Add Gmail</h2>
+      <p class="muted small" id="gmail-lede">Your Primary inbox, Sent mail and Important mail become notes (you can change this later on the Gmail page). Gmail signs in with an app password, a separate 16-letter password for this app only. Do these steps first:</p></header>
+    <ol class="signin-steps gmail-steps">
+      <li><strong><a href="https://myaccount.google.com/signinoptions/twosv" target="_blank" rel="noopener noreferrer">Turn on 2-Step Verification</a></strong> for your Google account. Skip this if it is already on.</li>
+      <li><strong><a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">Create an app password</a>.</strong> Type the name Third Brain and click Create.</li>
+      <li><strong>Copy the 16-character password</strong> Google shows (spaces do not matter) and paste it below.</li>
+      <li><strong><a href="https://mail.google.com/mail/u/0/#settings/fwdandpop" target="_blank" rel="noopener noreferrer">Make sure IMAP is on in Gmail</a></strong>, if your Gmail settings show the option. It is on by default for most accounts.</li>
+    </ol>
+    <div class="field"><label for="gmail-address">Gmail address</label><input class="key" id="gmail-address" name="address" type="email" inputmode="email" autocomplete="off" spellcheck="false" placeholder="name@gmail.com" required></div>
+    <div class="field"><label for="gmail-password">App password</label><input class="key" id="gmail-password" name="password" type="password" autocomplete="new-password" spellcheck="false" placeholder="xxxx xxxx xxxx xxxx" required>
+      <p class="hint">16 letters, from step 2. Stored encrypted on this computer, outside the vault, and never shown again.</p></div>
+    <fieldset class="choices window-choices" id="gmail-choices"><legend>History window</legend></fieldset>
+    <p class="callout" id="gmail-writer"></p>
+    <p class="alert" id="gmail-error" role="alert" hidden></p>
+    <div class="actions end"><button class="btn btn-quiet" type="button" id="gmail-cancel">Cancel</button><button class="btn" type="submit" id="gmail-submit">Test and connect</button></div>
+  </form>
+</dialog>
+</body>
+</html>

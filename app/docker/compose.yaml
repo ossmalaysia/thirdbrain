@@ -1,0 +1,24 @@
+name: brain
+services:
+  scheduler:
+    build: .
+    image: brain-scheduler:local
+    container_name: brain-scheduler
+    restart: unless-stopped
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 128m
+    cpus: 0.25
+    volumes:
+      - type: bind
+        source: ${BRAIN_SCHEDULER_DIR:?Set the local scheduler control directory}
+        target: /control
+    healthcheck:
+      test: [CMD, node, /app/scheduler.mjs, --health]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

@@ -1,0 +1,22 @@
+{
+  "product": { "name": "Third Brain" },
+  "owner": {
+    "name": "Aisyah Rahman",
+    "shortName": "Aisyah",
+    "emails": ["aisyah@example.com"],
+    "org": "Contoh Sdn Bhd",
+    "role": "founder",
+    "pronouns": "she"
+  },
+  "vault": {
+    "path": "C:\\Users\\aisyah\\ThirdBrain",
+    "indexExclude": ["life/**", "clients/**", "_setup/**", "templates/**"]
+  },
+  "microsoft": {
+    "account": "aisyah@example.com",
+    "clientId": "00000000-0000-0000-0000-000000000000",
+    "tenantId": "organizations"
+  },
+  "settingsFile": "settings.env",
+  "backup": { "localOnlyRepos": ["life"] }
+}

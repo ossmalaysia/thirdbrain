@@ -1,0 +1,49 @@
+{
+  "name": "thirdbrain-desktop",
+  "productName": "Third Brain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop window and tray icon for the Third Brain portal. The background service does the work.",
+  "license": "Apache-2.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke",
+    "icons": "electron scripts/make-icons.js",
+    "test": "bun test",
+    "dist": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "44.9.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "my.ossmalaysia.thirdbrain",
+    "productName": "Third Brain",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "rules.js",
+      "offline.html",
+      "assets/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Third Brain",
+      "runAfterFinish": true,
+      "artifactName": "ThirdBrain-Setup-${version}.exe"
+    }
+  }
+}

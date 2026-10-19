@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Third Brain is not running</title>
+  <style>
+    :root { --bg: #f7f7f5; --fg: #1d1d1b; --muted: #5f5f5a; --card: #fff; --line: #e2e2dc; --accent: #2f5bd3; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #161615; --fg: #ededea; --muted: #a3a39d; --card: #20201e; --line: #34342f; --accent: #7d9cf0; } }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--fg);
+      font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 440px; margin: 16px; padding: 32px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; text-align: center; }
+    img { width: 64px; height: 64px; }
+    h1 { font-size: 20px; margin: 16px 0 8px; }
+    p { color: var(--muted); margin: 0 0 20px; }
+    code { font-size: 13px; }
+    button { font: inherit; padding: 8px 20px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <main>
+    <img src="assets/icon.png" alt="">
+    <h1>Third Brain is not running on this computer</h1>
+    <p>The window shows the portal at <code id="url"></code>, and nothing answers there.
+      Start the <strong>BrainPortal</strong> scheduled task (Task Scheduler, or <code>schtasks /run /tn BrainPortal</code>), then retry.</p>
+    <button id="retry" type="button" autofocus>Retry</button>
+  </main>
+  <script>
+    // The main process passes the portal address as ?url=. Retry simply loads it again;
+    // if it still fails, the main process brings this page back.
+    const portal = new URLSearchParams(location.search).get("url") || "http://127.0.0.1:58432/";
+    document.getElementById("url").textContent = portal;
+    document.getElementById("retry").addEventListener("click", () => location.replace(portal));
+  </script>
+</body>
+</html>
