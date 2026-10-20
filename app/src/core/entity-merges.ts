@@ -1,7 +1,7 @@
 // Entity merges: which entity pages are the same person, company or project. The note writer names the same client in
-// different ways ("Acme Lux", "ACMELUX", "Acmelux Media"), and each spelling became its own page. Two kinds of merge:
+// different ways ("Fabrikam", "FABRIKAM", "Fab Rikam Media"), and each spelling became its own page. Two kinds of merge:
 //  - auto: names equal after removing spaces, dashes, dots and (companies/projects) a final "s". Safe; no question.
-//  - user: chosen on the portal's Entities page ("Merge" / "Not the same"). "Acme Lux" vs "Acme Lux Trading" can be one
+//  - user: chosen on the portal's Entities page ("Merge" / "Not the same"). "Fabrikam" vs "Fabrikam Trading" can be one
 //    client or two legal companies; only the owner knows.
 // The list lives in the vault next to the pages (committed and backed up with them), so every rebuild and every
 // machine resolves names the same way, and a merged spelling never comes back as a new page.

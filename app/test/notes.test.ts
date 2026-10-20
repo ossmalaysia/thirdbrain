@@ -6,14 +6,14 @@ import { createPortal, type PortalDeps } from "../src/portal.ts";
 import { noteTitle, obsidianUrl, parseNote } from "../portal/view.js";
 import { freePort } from "./fixtures.ts";
 
-const NOTE = "inbox/email/threads/2026-10/2026-10-08-acme-lux-q1-review-preparation.md";
+const NOTE = "inbox/email/threads/2026-10/2026-10-08-fabrikam-q1-review-preparation.md";
 
 test("note helpers derive a readable title, an Obsidian link and the body", () => {
-  expect(noteTitle(NOTE)).toBe("Acme lux q1 review preparation");
+  expect(noteTitle(NOTE)).toBe("Fabrikam q1 review preparation");
   expect(noteTitle("inbox/email/threads/2026-10/2026-10-08-sync-0123456789abcdef.md")).toBe("Sync");
-  expect(obsidianUrl("brain", NOTE)).toBe("obsidian://open?vault=brain&file=inbox%2Femail%2Fthreads%2F2026-10%2F2026-10-08-acme-lux-q1-review-preparation");
-  expect(parseNote(NOTE, '---\ntitle: "Acme Lux: Q1 review"\nsource: outlook-sync\n---\n\n# Summary\nAgreed.\n')).toEqual({ title: "Acme Lux: Q1 review", body: "# Summary\nAgreed." });
-  expect(parseNote(NOTE, "No frontmatter").title).toBe("Acme lux q1 review preparation");
+  expect(obsidianUrl("brain", NOTE)).toBe("obsidian://open?vault=brain&file=inbox%2Femail%2Fthreads%2F2026-10%2F2026-10-08-fabrikam-q1-review-preparation");
+  expect(parseNote(NOTE, '---\ntitle: "Fabrikam: Q1 review"\nsource: outlook-sync\n---\n\n# Summary\nAgreed.\n')).toEqual({ title: "Fabrikam: Q1 review", body: "# Summary\nAgreed." });
+  expect(parseNote(NOTE, "No frontmatter").title).toBe("Fabrikam q1 review preparation");
 });
 
 test("note endpoint serves only notes in the connector folders", async () => {
@@ -42,7 +42,7 @@ test("note endpoint serves only notes in the connector folders", async () => {
 
 test("note preview Markdown: headings, lists, bold labels and safe links only", async () => {
   const { markdownBlocks, inlineMarkdown } = await import("../portal/view.js");
-  const blocks = markdownBlocks("# Acme Lux: review\n\n## Summary\nLine one\nline two.\n\n## Detail\n- **Decision:** Renew\n- **Commitment (Aisyah → Acme):** Send PDF. Status: open\n\n## Links\n- [Open in Outlook](https://outlook.office365.com/owa/?ItemID=x)", "Acme Lux: review");
+  const blocks = markdownBlocks("# Fabrikam: review\n\n## Summary\nLine one\nline two.\n\n## Detail\n- **Decision:** Renew\n- **Commitment (Aisyah → Acme):** Send PDF. Status: open\n\n## Links\n- [Open in Outlook](https://outlook.office365.com/owa/?ItemID=x)", "Fabrikam: review");
   expect(blocks.map(b => b.type)).toEqual(["h", "p", "h", "ul", "h", "ul"]); // the title heading is dropped (shown above)
   expect(blocks[1].inline).toEqual([{ t: "text", text: "Line one line two." }]);
   expect(blocks[3].items[0][0]).toEqual({ t: "b", text: "Decision:" });
