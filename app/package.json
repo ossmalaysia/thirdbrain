@@ -11,7 +11,7 @@
     "@anthropic-ai/sdk": "^0.134.0",
     "fflate": "^0.8.3",
     "imapflow": "2.2.5",
-    "mailparser": "3.9.35",
+    "mailparser": "3.9.36",
     "openai": "^7.33.0",
     "unpdf": "^1.9.0"
   }
