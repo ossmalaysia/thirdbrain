@@ -8,7 +8,7 @@ const TOKENS = [["ja", "zz"], ["anchor", "sprint"], ["athen", "mark"], ["tail15"
 const PATTERN = new RegExp([...TOKENS, "D:(?:\\\\{1,2}|/)" + "brain\\b"].join("|"), "i");
 
 const ROOT = join(import.meta.dir, "..", "..");
-const SCAN = ["app/src", "app/portal", "app/test", "app/docker", "app/package.json", "app/config.example.json", "docs", "scripts", "README.md"];
+const SCAN = ["app/src", "app/scripts", "app/portal", "app/test", "app/docker", "app/package.json", "app/config.example.json", "docs", "scripts", "README.md"];
 const TEXT = /\.(ts|js|mjs|json|html|css|md|txt|ps1|yml|yaml|toml|svg)$/i;
 
 function files(path: string): string[] {

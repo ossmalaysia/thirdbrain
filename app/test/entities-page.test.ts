@@ -24,13 +24,13 @@ test("groupByOrg: biggest organisation first, no organisation last, one heading 
 });
 
 test("groupDuplicates: one card per page that stays, heaviest first", () => {
-  const keep = { kind: "company", slug: "acme-lux", name: "Acme Lux", notes: 60 }, other = { kind: "company", slug: "zeta", name: "Zeta", notes: 2 };
+  const keep = { kind: "company", slug: "fabrikam", name: "Fabrikam", notes: 60 }, other = { kind: "company", slug: "zeta", name: "Zeta", notes: 2 };
   const pairs = [
     { kind: "company", keep: other, merge: { slug: "zeta-co", name: "Zeta Co", notes: 1 }, reason: "r" },
-    { kind: "company", keep, merge: { slug: "acme-lux-media", name: "Acme Lux Media", notes: 12 }, reason: "r1" },
-    { kind: "company", keep, merge: { slug: "acme-lux-led", name: "Acme Lux Led", notes: 1 }, reason: "r2" },
+    { kind: "company", keep, merge: { slug: "fabrikam-media", name: "Fabrikam Media", notes: 12 }, reason: "r1" },
+    { kind: "company", keep, merge: { slug: "fabrikam-led", name: "Fabrikam Led", notes: 1 }, reason: "r2" },
   ];
   const g = groupDuplicates(pairs);
-  expect(g.map(x => x.keep.slug)).toEqual(["acme-lux", "zeta"]);
-  expect(g[0].candidates.map(c => c.merge.slug)).toEqual(["acme-lux-media", "acme-lux-led"]);
+  expect(g.map(x => x.keep.slug)).toEqual(["fabrikam", "zeta"]);
+  expect(g[0].candidates.map(c => c.merge.slug)).toEqual(["fabrikam-media", "fabrikam-led"]);
 });

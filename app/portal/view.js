@@ -440,7 +440,7 @@ export function groupByOrg(rows) {
   return [...groups].sort(([a, ga], [b, gb]) => (a === '') - (b === '') || total(gb) - total(ga) || a.localeCompare(b))
     .flatMap(([org, g]) => g.map((r, i) => ({ ...r, group: i === 0 ? (org || 'No organisation') : null, groupSize: g.length })));
 }
-/** Possible duplicates grouped by the page that stays: "Acme Lux" with each name that may be the same. */
+/** Possible duplicates grouped by the page that stays: "Fabrikam" with each name that may be the same. */
 export function groupDuplicates(pairs) {
   const groups = new Map();
   for (const p of pairs) {
@@ -590,7 +590,7 @@ export function noteDay(n, now = new Date()) {
 /** Small tags under a note: client, project, account (AI chats), in that order, when present. */
 export const noteTags = n => [['client', 'Client'], ['project', 'Project'], ['account', 'Account']].filter(([k]) => n[k] && n[k] !== 'null').map(([k, label]) => ({ kind: k, label, text: n[k] }));
 
-// Notes written by a run. Paths are vault-relative, e.g. inbox/email/threads/2026-10/2026-10-08-ak-lux-q1-review.md
+// Notes written by a run. Paths are vault-relative, e.g. inbox/email/threads/2026-10/2026-10-08-fabrikam-q1-review.md
 export const noteTitle = path => {
   const words = path.split('/').pop().replace(/\.md$/, '').replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/-[0-9a-f]{16}$/, '').replace(/-/g, ' ');
   return words.charAt(0).toUpperCase() + words.slice(1);

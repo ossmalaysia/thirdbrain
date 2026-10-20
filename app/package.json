@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
-    "mailsync": "bun run src/cli.ts"
+    "mailsync": "bun run src/cli.ts",
+    "demo": "bun run scripts/demo.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.135.0",

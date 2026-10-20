@@ -274,22 +274,22 @@ describe("merges", () => {
     const { loadMerges } = await import("../src/core/entity-merges.ts");
     const v = vault();
     try {
-      v.put("inbox/entities/companies/acme-lux.md", company("acme-lux", "Acme Lux", ["inbox/ai/chatgpt/a", "inbox/ai/chatgpt/b"]));
-      v.put("inbox/entities/companies/acmelux.md", company("acmelux", "Acmelux", ["inbox/ai/chatgpt/c"]));
-      v.put("inbox/ai/chatgpt/a.md", chat("A", "acme-lux")); v.put("inbox/ai/chatgpt/b.md", chat("B", "acme-lux"));
-      v.put("inbox/ai/chatgpt/c.md", chat("C", "acmelux"));
+      v.put("inbox/entities/companies/tail-spin.md", company("tail-spin", "Tail Spin", ["inbox/ai/chatgpt/a", "inbox/ai/chatgpt/b"]));
+      v.put("inbox/entities/companies/tailspin.md", company("tailspin", "Tailspin", ["inbox/ai/chatgpt/c"]));
+      v.put("inbox/ai/chatgpt/a.md", chat("A", "tail-spin")); v.put("inbox/ai/chatgpt/b.md", chat("B", "tail-spin"));
+      v.put("inbox/ai/chatgpt/c.md", chat("C", "tailspin"));
       const r = rebuildEntities(v.root, OWNER, "2026-10-18", { dryRun: false });
       expect(r.report.pagesMerged).toBe(1);
-      expect(existsSync(join(v.root, "inbox/entities/companies/acmelux.md"))).toBe(false);
-      expect(v.read("inbox/ai/chatgpt/c.md")).toContain("- Client: [[inbox/entities/companies/acme-lux|Acme Lux]]");
-      const page = v.read("inbox/entities/companies/acme-lux.md");
+      expect(existsSync(join(v.root, "inbox/entities/companies/tailspin.md"))).toBe(false);
+      expect(v.read("inbox/ai/chatgpt/c.md")).toContain("- Client: [[inbox/entities/companies/tail-spin|Tail Spin]]");
+      const page = v.read("inbox/entities/companies/tail-spin.md");
       expect(page).toContain("note_count: 3");
-      expect(page).toContain('"Acmelux"');                                   // the other spelling is an alias
-      expect(loadMerges(v.root).merges).toEqual([expect.objectContaining({ kind: "company", from: "acmelux", to: "acme-lux", by: "auto" })]);
-      // The next sync: a note that names "ACMELUX" links the kept page; no new page.
+      expect(page).toContain('"Tailspin"');                                   // the other spelling is an alias
+      expect(loadMerges(v.root).merges).toEqual([expect.objectContaining({ kind: "company", from: "tailspin", to: "tail-spin", by: "auto" })]);
+      // The next sync: a note that names "TAILSPIN" links the kept page; no new page.
       const store = EntityStore.load(v.root, OWNER);
-      expect(linkNote(store, "inbox/ai/chatgpt/d.md", chat("D", "acmelux")).content).toContain("companies/acme-lux|Acme Lux]]");
-      expect(store.pages("2026-10-18").map(p => p.relPath)).toEqual(["inbox/entities/companies/acme-lux.md"]);
+      expect(linkNote(store, "inbox/ai/chatgpt/d.md", chat("D", "tailspin")).content).toContain("companies/tail-spin|Tail Spin]]");
+      expect(store.pages("2026-10-18").map(p => p.relPath)).toEqual(["inbox/entities/companies/tail-spin.md"]);
       expect(rebuildEntities(v.root, OWNER, "2026-10-18", { dryRun: true }).report).toMatchObject({ notesLinked: 0, pagesChanged: 0, pagesMerged: 0 });
     } finally { v.cleanup(); }
   });

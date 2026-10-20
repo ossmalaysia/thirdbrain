@@ -21,7 +21,21 @@ desktop app for Windows and macOS).
 - **Safety:** credential check before any AI sees text, personal-matter skip rule, nothing leaves your machine
   unless you turn on remote access or a backup push.
 - **Portal:** Connectors (add, accounts, history window with cost estimate), Notes (search, date filter, paging),
-  Sync runs, Usage (tokens and spend per provider), Vault backup, Remote access (Cloudflare tunnel), Settings.
+  Sync runs, Entities (people, companies, projects, topics; duplicate review), Dream (nightly linking), Usage
+  (tokens and spend per provider), Vault backup, Remote access (Cloudflare tunnel), Settings.
+
+## Screenshots
+
+From the demo portal (`cd app && bun run demo`), with invented data. The full tour is in the
+[feature guide](docs/features.md).
+
+![Connectors: one card per source with its account, note count and last sync](docs/feature-screen/connectors-dark.png)
+
+| Notes | Entities: review duplicates |
+|---|---|
+| ![Notes page with tabs per source, search and date filter](docs/feature-screen/notes-light.png) | ![Possible duplicate companies and people with Merge and Not the same](docs/feature-screen/entities-duplicates-dark.png) |
+| **Gmail: what to include** | **Usage** |
+| ![Gmail connector with tabs, labels and message counts](docs/feature-screen/connector-gmail-dark.png) | ![Tokens and spend per provider and per day](docs/feature-screen/usage-dark.png) |
 
 ## Important
 
@@ -35,6 +49,14 @@ desktop app for Windows and macOS).
 
 - `app/` - Bun server, sync pipeline, connectors and the portal UI (`app/portal`), with tests (`bun test`).
 - `docs/` - architecture, operations, [configuration](docs/configuration.md), roadmap.
+
+## Docs
+
+- [Feature guide](docs/features.md) - every portal screen, with screenshots.
+- [Configuration](docs/configuration.md) - `config.json`, the settings file and the CLI.
+- [Operations](docs/operations.md) - Microsoft setup, Gmail, Claude.ai, updates, restarting the portal.
+- [Architecture](docs/architecture.md), [decision model](docs/decision-model.md), [roadmap](docs/roadmap.md).
+- Try the portal on invented data: `cd app && bun run demo`, then open http://localhost:58600/.
 
 ## Configuration
 
