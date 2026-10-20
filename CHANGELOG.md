@@ -3,6 +3,13 @@
 All notable changes to Third Brain. Versions follow [semantic versioning](https://semver.org/). The app version is
 `version` in `app/package.json`; the desktop app (`desktop/package.json`) keeps the same number.
 
+## Unreleased
+
+- **Install:** README Quick start and a full [install guide](docs/install.md) with troubleshooting;
+  `scripts/windows/setup-scheduler.ps1` sets up the Docker sync schedule; `config init --client-id --tenant-id`;
+  `THIRDBRAIN_PORT` changes the portal port; `install-gbrain.ps1` no longer adds a stdio GBrain server per agent
+  (it locked out the portal's GBrain).
+
 ## 0.1.1 - 2026-10-20
 
 - **Security:** fixes for all 10 findings of the first CodeQL code scan: the desktop "not running" page goes back

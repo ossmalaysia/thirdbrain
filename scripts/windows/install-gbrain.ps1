@@ -1,6 +1,6 @@
 # One-time install: GBrain + index the vault + wire Claude Code locally.
 # Run from PowerShell:  powershell -ExecutionPolicy Bypass -File <repo>\scripts\windows\install-gbrain.ps1
-# Safe to re-run. Verified against GBrain 0.53.0.0 on Windows 11.
+# Safe to re-run. Run it while the portal is stopped (GBrain's database allows one process).
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'load-env.ps1')
 $Brain = $env:BRAIN_PATH
@@ -54,18 +54,9 @@ gbrain extract --stale
 
 gbrain doctor
 
-# Absolute path: apps started before the PATH change (e.g. Claude desktop) can't resolve bare 'gbrain'.
-$GbrainExe = Join-Path $BunBin 'gbrain.exe'
-if (Get-Command claude -ErrorAction SilentlyContinue) {
-    Write-Host 'Wiring Claude Code (local stdio, no tunnel)...'
-    claude mcp remove --scope user gbrain 2>$null
-    claude mcp add --scope user gbrain -- $GbrainExe serve --surface verbs
-}
-if (Get-Command codex -ErrorAction SilentlyContinue) {
-    Write-Host 'Wiring Codex (local stdio)...'
-    codex mcp remove gbrain 2>$null
-    codex mcp add gbrain -- $GbrainExe serve --surface verbs
-}
-
+# Claude Code and Codex: connect them to the ONE GBrain server the portal runs (http://127.0.0.1:<BRAIN_PORT>/mcp).
+# Never add a stdio `gbrain serve` per agent: GBrain's database (PGLite) allows one process, so a second server
+# locks out the portal's. See docs/install.md, "Connect Claude Code and Codex".
 Write-Host ''
 Write-Host 'Done. Test with:  gbrain query "brain setup"'
+Write-Host 'To connect Claude Code or Codex, see docs/install.md (Connect Claude Code and Codex).'

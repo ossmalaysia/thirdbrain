@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkMailbox, DEFAULT_INDEX_EXCLUDE, describeConfig, initConfigFile, loadAppConfig, readSettings, resolveStateDir } from "../src/config.ts";
+import { checkMailbox, DEFAULT_INDEX_EXCLUDE, describeConfig, initConfigFile, loadAppConfig, portalPort, readSettings, resolveStateDir } from "../src/config.ts";
 import { loadConfig, saveConfig } from "../src/state.ts";
 
 const dir = () => mkdtempSync(join(tmpdir(), "tb-config-"));
@@ -132,4 +132,22 @@ test("config.example.json is a valid configuration", () => {
   expect(c.owner.name).toBe("Aisyah Rahman");
   expect(c.vault.indexExclude).toContain("clients/**");
   expect(c.settingsFile).toBe(join(import.meta.dir, "..", "settings.env"));
+});
+
+test("config init: --client-id and --tenant-id are written to config.json and must be UUIDs", () => {
+  const d = dir(), file = join(d, "config.json"), empty = join(d, "none.env");
+  const client = "22222222-2222-2222-2222-222222222222", tenant = "33333333-3333-3333-3333-333333333333";
+  expect(initConfigFile({ vault: "C:\Users\you\Brain", clientId: client, tenantId: tenant, settingsFile: empty }, file))
+    .toMatchObject({ microsoft: { clientId: client, tenantId: tenant } });
+  expect(loadAppConfig({ file, stateDir: d, env: {} }).microsoft).toMatchObject({ clientId: client, tenantId: tenant });
+  expect(() => initConfigFile({ clientId: "not-a-uuid", force: true }, file)).toThrow("--client-id");
+  expect(() => initConfigFile({ tenantId: "contoso.com", force: true }, file)).toThrow("--tenant-id");
+  expect(JSON.parse(readFileSync(file, "utf8")).microsoft.clientId).toBe(client); // the bad init changed nothing
+});
+
+test("portal port: 58432 unless THIRDBRAIN_PORT names another valid port", () => {
+  expect(portalPort({})).toBe(58432);
+  expect(portalPort({ THIRDBRAIN_PORT: "" })).toBe(58432);
+  expect(portalPort({ THIRDBRAIN_PORT: "58500" })).toBe(58500);
+  for (const bad of ["80", "70000", "58500x", "-1", "5.5"]) expect(() => portalPort({ THIRDBRAIN_PORT: bad })).toThrow("THIRDBRAIN_PORT");
 });

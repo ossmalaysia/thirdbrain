@@ -17,6 +17,12 @@ The state directory also holds tokens, API keys, logs and connector state (see [
 to a Third Brain name is planned and will come with a migration. `THIRDBRAIN_CONFIG` can point at a `config.json`
 somewhere else.
 
+## Portal port
+
+The portal answers on `http://127.0.0.1:58432`. Set the environment variable `THIRDBRAIN_PORT` (1024 to 65535) to
+use another port, for example for a second install. The Microsoft sign-in and the tunnel follow it; the desktop app
+needs `THIRDBRAIN_URL` set to the same address.
+
 Files the portal keeps there include `gmail.json` (the Gmail address and app password, encrypted; see
 [operations.md](operations.md#gmail) for how to create the app password) and `owner-identity.json` (addresses that
 count as the owner besides `owner.emails`, e.g. a connected Gmail address).
@@ -88,10 +94,12 @@ cd app
 bun run src/cli.ts config        # resolved configuration, settings file path and which keys it has (never values)
 bun run src/cli.ts config init --name "Aisyah Rahman" --email aisyah@example.com --org "Contoh Sdn Bhd" --role founder `
   --pronouns she --account aisyah@example.com --vault C:\Users\aisyah\ThirdBrain --settings-file C:\path\to\old\.env
+bun run src/cli.ts configure --client-id <UUID> --tenant-id <UUID>   # change the Microsoft app later
 ```
 
 `config init` writes `config.json` from the given values plus `BRAIN_PATH`, `MAILSYNC_CLIENT_ID` and
-`MAILSYNC_TENANT_ID` read from `--settings-file` (or the default settings file). Other options: `--short-name`,
+`MAILSYNC_TENANT_ID` read from `--settings-file` (or the default settings file). `--client-id` and `--tenant-id`
+(the app registration's Application and Directory IDs, UUIDs) win over the settings file. Other options: `--short-name`,
 `--product`, `--force` (replace an existing `config.json`); `--email` can be repeated or comma-separated. It refuses
 to write an invalid file. `vault.indexExclude` and `backup.localOnlyRepos` are edited by hand.
 

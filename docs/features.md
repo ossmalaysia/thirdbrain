@@ -80,11 +80,14 @@ of the sync stages is in [architecture](architecture.md).
 
 ## Getting started
 
-1. Install Bun, Git and Obsidian, clone this repo and run `bun install` in `app/`.
-2. Write `config.json` in the state directory (`~/.brain-mailsync` by default): owner, vault path, Microsoft 365
-   account. See [configuration](configuration.md) and [`app/config.example.json`](../app/config.example.json).
-3. Start the portal and keep it running: on Windows the `BrainPortal` scheduled task, see
-   [operations](operations.md). Open **http://localhost:58432/**.
+The full setup, step by step, is in the [install guide](install.md). In short:
+
+1. Install Git, Bun and Docker Desktop, clone this repo, run `bun install` in `app/` and create the vault (a Git
+   repository).
+2. Register a Microsoft Entra app, then write `config.json` with `bun run src/cli.ts config init` (owner, vault path,
+   Microsoft 365 account, client and tenant ID). See [configuration](configuration.md).
+3. Turn on the sync schedule (`scripts/windows/setup-scheduler.ps1`), start the portal and keep it running: on
+   Windows the `BrainPortal` scheduled task. Open **http://localhost:58432/**.
 4. On **Connectors**, add your sources. Each one signs in once, then syncs on its own schedule.
 5. In **Settings**, choose the note writer (ChatGPT subscription, OpenAI API or Claude API).
 6. Optional: turn on **Vault backup** (private GitHub repo) and **Remote access** (Claude.ai and ChatGPT).
