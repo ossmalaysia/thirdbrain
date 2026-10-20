@@ -60,6 +60,16 @@ export function resolveStateDir(env: Env = process.env): string {
   return env.MAILSYNC_STATE_DIR || env.THIRDBRAIN_STATE_DIR || join(homedir(), ".brain-mailsync");
 }
 
+/** The portal's port on 127.0.0.1. THIRDBRAIN_PORT changes it (e.g. a second install, or when 58432 is taken). */
+export const DEFAULT_PORTAL_PORT = 58432;
+export function portalPort(env: Env = process.env): number {
+  const raw = env.THIRDBRAIN_PORT?.trim();
+  if (!raw) return DEFAULT_PORTAL_PORT;
+  const port = Number(raw);
+  if (!/^\d+$/.test(raw) || port < 1024 || port > 65535) throw new Error("THIRDBRAIN_PORT must be a port number from 1024 to 65535");
+  return port;
+}
+
 export const configPath = (stateDir = resolveStateDir(), env: Env = process.env) => env.THIRDBRAIN_CONFIG || join(stateDir, "config.json");
 
 /** Parses a key=value settings file (the format of the old `.env`). Missing file: no settings. */
@@ -175,12 +185,16 @@ export function describeConfig(cfg: AppConfig, file = configPath()) {
 }
 
 export interface InitOptions { name?: string; shortName?: string; emails?: string[]; org?: string; role?: string; pronouns?: string;
-  vault?: string; settingsFile?: string; account?: string; product?: string; force?: boolean }
+  vault?: string; settingsFile?: string; account?: string; clientId?: string; tenantId?: string; product?: string; force?: boolean }
+
+const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 /** `cli config init`: writes config.json from an existing settings file (e.g. an old .env) plus the given values.
  *  Only fields with a value are written; everything else keeps its default. Refuses to overwrite without force. */
 export function initConfigFile(opts: InitOptions, file = configPath()): Record<string, unknown> {
   if (existsSync(file) && !opts.force) throw new Error(`${file} already exists; pass --force to replace it`);
+  if (opts.clientId && !UUID.test(opts.clientId)) throw new Error("--client-id must be the Application (client) ID, a UUID");
+  if (opts.tenantId && !UUID.test(opts.tenantId) && !["organizations", "common"].includes(opts.tenantId)) throw new Error("--tenant-id must be the Directory (tenant) ID, a UUID");
   const settingsFile = opts.settingsFile ? resolve(opts.settingsFile) : undefined;
   const settings = readSettings(settingsFile ?? join(resolveStateDir(), "settings.env"));
   const drop = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== "" && !(Array.isArray(v) && !v.length)));
@@ -188,7 +202,7 @@ export function initConfigFile(opts: InitOptions, file = configPath()): Record<s
     product: opts.product ? { name: opts.product } : undefined,
     owner: drop({ name: opts.name, shortName: opts.shortName, emails: opts.emails?.map(e => e.toLowerCase()), org: opts.org, role: opts.role, pronouns: opts.pronouns }),
     vault: (opts.vault ?? settings.BRAIN_PATH) ? { path: opts.vault ?? settings.BRAIN_PATH } : undefined,
-    microsoft: drop({ account: opts.account?.toLowerCase(), clientId: settings.MAILSYNC_CLIENT_ID, tenantId: settings.MAILSYNC_TENANT_ID }),
+    microsoft: drop({ account: opts.account?.toLowerCase(), clientId: opts.clientId ?? settings.MAILSYNC_CLIENT_ID, tenantId: opts.tenantId ?? settings.MAILSYNC_TENANT_ID }),
     settingsFile,
   });
   for (const k of ["owner", "microsoft"]) if (!Object.keys(out[k] as object ?? {}).length) delete out[k];

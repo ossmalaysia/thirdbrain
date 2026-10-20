@@ -24,10 +24,11 @@ bun run start
 Checks: `bun test` (URL and status rules), `bun run smoke` (loads the window, prints the page title and the
 tray status, then quits). `THIRDBRAIN_URL=http://127.0.0.1:58999 bun run smoke` shows the "not running" page.
 
-## Start menu shortcut (for now)
+## Start menu shortcut (without the installer)
 
-There is no installer yet. To start the app from the Start menu on Windows, run this once in PowerShell
-from the `desktop` folder:
+Most people use the installer from the [latest release](https://github.com/ossmalaysia/thirdbrain/releases/latest)
+(see [Windows installer](#windows-installer)). To start a source checkout from the Start menu on Windows instead,
+run this once in PowerShell from the `desktop` folder:
 
 ```powershell
 $shell = New-Object -ComObject WScript.Shell

@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { loadConfig, loadState, saveConfig, STATE_DIR, type Config, type State } from "./state.ts";
-import { DEFAULT_PRODUCT_NAME, loadAppConfig, type AppConfig } from "./config.ts";
+import { DEFAULT_PRODUCT_NAME, loadAppConfig, portalPort, type AppConfig } from "./config.ts";
 import { makeAuthorization, validCallback, exchangeAuthorizationCode } from "./adapters/browser-login.ts";
 import { dockerBackend, dockerSchedule, dockerAction, runningCollector, startWorker, runHistory, type Schedule } from "./runner.ts";
 import { createAiService, type AiService } from "./ai-settings.ts";
@@ -122,7 +122,7 @@ const deps: PortalDeps = {
   backfill: { windows: () => readWindows(), set: (feed, days) => setWindow(feed, days, loadConfig()), estimate: feed => estimator.estimate(feed), reset: feed => estimator.reset(feed) },
   feedSchedule: { read: () => readSchedule(), set: saveInterval },
   usage: { report: range => usageReport(readLogLines(logsDir, rangeStart(range) ?? ""), loadState(), loadConfig(), range), savePrices: prices => { savePrices(prices); } },
-  remote: createRemoteAccess({ port: loadConfig().brainPort ?? 3131, tunnelPort: 58432 }), // tunnel -> portal, which forwards GBrain paths
+  remote: createRemoteAccess({ port: loadConfig().brainPort ?? 3131, tunnelPort: portalPort() }), // tunnel -> portal, which forwards GBrain paths
 };
 
 /** The 5-second status poll sends the newest runs only (the Sync runs page shows 20); totals stay complete. */
@@ -243,7 +243,7 @@ const confirmPage = (product: string, token: string) => new Response(
   { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer", "x-frame-options": "DENY",
     "content-security-policy": "default-src 'self'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" } });
 
-export function createPortal(port = 58432, services: PortalDeps = deps) {
+export function createPortal(port = portalPort(), services: PortalDeps = deps) {
   const control = randomBytes(32).toString("hex");
   const redirectUri = `http://localhost:${port}/`;
   let pending: { auth: ReturnType<typeof makeAuthorization>; cfg: Config; expires: number } | null = null;

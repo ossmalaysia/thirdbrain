@@ -43,11 +43,11 @@ function configCommand(): number {
   if (args[0] === "init") {
     const written = initConfigFile({ name: value("--name"), shortName: value("--short-name"), emails: values("--email"), org: value("--org"),
       role: value("--role"), pronouns: value("--pronouns"), vault: value("--vault"), settingsFile: value("--settings-file"),
-      account: value("--account"), product: value("--product"), force: flag("--force") });
+      account: value("--account"), clientId: value("--client-id"), tenantId: value("--tenant-id"), product: value("--product"), force: flag("--force") });
     console.log(JSON.stringify(written, null, 2));
     return 0;
   }
-  if (args[0]) { console.error("usage: mailsync config [init --name N --short-name S --email E [--email E2] --org O --role R --pronouns he|she|they --vault PATH --settings-file PATH --account EMAIL --product NAME --force]"); return 2; }
+  if (args[0]) { console.error("usage: mailsync config [init --name N --short-name S --email E [--email E2] --org O --role R --pronouns he|she|they --vault PATH --settings-file PATH --account EMAIL --client-id UUID --tenant-id UUID --product NAME --force]"); return 2; }
   console.log(JSON.stringify(describeConfig(loadAppConfig()), null, 2));
   return 0;
 }
