@@ -6,7 +6,8 @@
   "scripts": {
     "test": "bun test",
     "mailsync": "bun run src/cli.ts",
-    "demo": "bun run scripts/demo.ts"
+    "demo": "bun run scripts/demo.ts",
+    "screenshots": "bun run scripts/screenshots.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.135.0",
@@ -15,5 +16,8 @@
     "mailparser": "3.9.36",
     "openai": "7.34.0",
     "unpdf": "^1.9.0"
+  },
+  "devDependencies": {
+    "playwright-core": "1.63.0"
   }
 }
