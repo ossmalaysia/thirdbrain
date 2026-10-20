@@ -8,7 +8,7 @@ const TOKENS = [["ja", "zz"], ["anchor", "sprint"], ["athen", "mark"], ["tail15"
 const PATTERN = new RegExp([...TOKENS, "D:(?:\\\\{1,2}|/)" + "brain\\b"].join("|"), "i");
 
 const ROOT = join(import.meta.dir, "..", "..");
-const SCAN = ["app/src", "app/scripts", "app/portal", "app/test", "app/docker", "app/package.json", "app/config.example.json", "docs", "scripts", "README.md"];
+const SCAN = ["app/src", "app/scripts", "app/portal", "app/test", "app/docker", "app/package.json", "app/config.example.json", "docs", "scripts", "README.md", "CONTRIBUTING.md"];
 const TEXT = /\.(ts|js|mjs|json|html|css|md|txt|ps1|yml|yaml|toml|svg)$/i;
 
 function files(path: string): string[] {
@@ -19,7 +19,10 @@ function files(path: string): string[] {
 }
 
 test("no personal names, addresses, domains or paths in code, tests, docs or scripts", () => {
-  const hits = SCAN.flatMap(p => files(join(ROOT, p))).flatMap(file => readFileSync(file, "utf8").split(/\r?\n/)
+  const scanned = SCAN.flatMap(p => files(join(ROOT, p)));
+  // The demo portal and the screenshot script produce the published images: they must stay covered.
+  for (const script of ["app/scripts/demo.ts", "app/scripts/screenshots.ts"]) expect(scanned).toContain(join(ROOT, script));
+  const hits = scanned.flatMap(file => readFileSync(file, "utf8").split(/\r?\n/)
     .flatMap((line, i) => PATTERN.test(line) ? [`${relative(ROOT, file)}:${i + 1}: ${line.trim().slice(0, 120)}`] : []));
   expect(hits).toEqual([]);
 });

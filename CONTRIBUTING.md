@@ -17,6 +17,21 @@ bun test --timeout 60000
 
 The desktop app: `cd desktop && bun install && bun test && bun run start`.
 
+## Updating the screenshots
+
+The images in [`docs/feature-screen/`](docs/feature-screen/) come from the demo portal (invented data). When you
+change a page, run `bun run screenshots` and commit the images:
+
+```
+cd app
+bun run screenshots                    # all images, about 20 seconds
+bun run screenshots --only notes-dark  # one image
+```
+
+It uses the Microsoft Edge or Google Chrome installed on your computer (nothing is downloaded), blocks every request
+outside the demo portal, and removes its temporary vault and state folders when it ends. Look at the changed images
+before you commit them.
+
 ## Rules for every change
 
 1. **No real data.** Never commit real names, e-mail addresses, client names, tokens, keys or vault paths, also not in

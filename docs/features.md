@@ -6,6 +6,78 @@ All screenshots come from the demo portal (`cd app && bun run demo`), which runs
 data: made-up people and companies (Northwind, Contoso, Fabrikam, Globex) and `example.com` / `example.org`
 addresses. Nothing in them comes from a real mailbox or vault.
 
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph SRC["Sources"]
+    direction TB
+    MS["Outlook mail<br/>Teams chats and channels<br/>Meetings"]
+    GM["Gmail"]
+    CH["Claude.ai chats<br/>ChatGPT chats"]
+  end
+
+  subgraph SYNC["Third Brain sync"]
+    direction TB
+    FI["Filters and<br/>secret check"]
+    DM["Decision model<br/>triage (optional)"]
+    NW["Note writer<br/>ChatGPT subscription,<br/>OpenAI API or Claude API"]
+    FI --> DM --> NW
+  end
+
+  subgraph VAULT["Markdown vault"]
+    direction TB
+    NO["Inbox notes"]
+    EN["Entity and topic pages"]
+    RN["Related notes"]
+    GB["Git backup<br/>(private GitHub)"]
+  end
+
+  subgraph IDX["GBrain index"]
+    direction TB
+    SE["Keyword + semantic search<br/>(local Ollama embeddings)"]
+    MCP["MCP server"]
+    SE --- MCP
+  end
+
+  subgraph CLI["Clients"]
+    direction TB
+    LO["Claude Code, Codex<br/>(this computer)"]
+    RE["Claude.ai, ChatGPT"]
+    OB["Obsidian"]
+  end
+
+  MS -- "Microsoft Graph" --> FI
+  GM -- "IMAP" --> FI
+  CH -- "web sign-in" --> FI
+  NW --> NO
+  VAULT -- "gbrain sync" --> SE
+  MCP --> LO
+  MCP -- "Cloudflare tunnel + OAuth" --> RE
+  VAULT -. "reads files" .-> OB
+
+  PO["Portal<br/>settings, status,<br/>PWA and desktop app"] -.-> SYNC
+  DR["Nightly Dream<br/>links, duplicates, embeddings"] -.-> VAULT
+  DR -.-> IDX
+```
+
+- **Sources:** connectors read new items on a schedule: Outlook mail, Teams chats and channels and meetings through
+  Microsoft Graph (read-only), Gmail over IMAP with an app password, and Claude.ai and ChatGPT chats through their
+  web sign-ins.
+- **Sync:** plain code drops noise and blocks passwords, one-time codes, card, bank and ID numbers and keys before any
+  AI sees it. The optional decision model skips clear noise and personal matters; the note writer you choose turns
+  each kept conversation into a short, sourced note.
+- **Vault:** notes, entity and topic pages and related-note links are plain Markdown in your Obsidian vault. The
+  vault backup commits it to Git and pushes it to your private GitHub repository.
+- **Index and clients:** GBrain indexes the vault (keyword search plus semantic search with local Ollama embeddings)
+  and serves it over MCP: to Claude Code and Codex on this computer, and to Claude.ai and ChatGPT only when you turn
+  on remote access (Cloudflare tunnel, GBrain OAuth). The nightly Dream refreshes links, duplicates and embeddings.
+- **Local-first:** the vault, the index, the state and the keys stay on your computer, and the portal answers on
+  `127.0.0.1`. Only the AI providers you choose (note writer, decision model) receive conversation text.
+
+The portal (settings, status, phone app and desktop app) controls all of this; see the screens below. The design
+of the sync stages is in [architecture](architecture.md).
+
 ## Getting started
 
 1. Install Bun, Git and Obsidian, clone this repo and run `bun install` in `app/`.
@@ -195,6 +267,14 @@ Who can reach your brain. Claude Code and Codex on the laptop always can; Claude
 
 The portal installs as an app on a phone (through a tunnel and a sign-in link). A bottom tab bar holds Connectors,
 Notes, Sync runs and Entities; **More** opens the rest. Tables turn into one card per row.
+
+## Updating the screenshots
+
+Every image on this page comes from `bun run screenshots` in `app/`
+([`app/scripts/screenshots.ts`](../app/scripts/screenshots.ts)). It starts the demo portal in the same process, opens
+each screen in the installed Microsoft Edge or Google Chrome (1440 x 900, or 390 x 844 for the phone images; dark
+unless the name ends in `-light`) and writes the PNG files to `docs/feature-screen/` with the names used here.
+`--only <name>` redoes one image. When you change a page, run `bun run screenshots` and commit the images.
 
 ## More
 
