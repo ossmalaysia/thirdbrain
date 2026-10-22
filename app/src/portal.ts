@@ -17,6 +17,7 @@ import { liveSample } from "./backfill-live.ts";
 import { CHATGPT_FEED } from "./adapters/chatgpt-web.ts";
 import { GMAIL_FEED, GmailError } from "./adapters/gmail-imap.ts";
 import { createGmailService, type GmailService } from "./gmail.ts";
+import { createWhatsAppService, type WhatsAppService } from "./whatsapp.ts";
 import { RANGES, savePrices, usageReport, rangeStart, type Range } from "./usage.ts";
 import { createDream, type Dream } from "./dream.ts";
 import { automaticDecisions, createEntityIndex, createMergeApplier, ENTITY_KINDS, recordDistinct, recordMerge, undoMerge, type EntityIndex } from "./entities-view.ts";
@@ -61,6 +62,8 @@ export interface PortalDeps {
   usage?: { report: (range: Range) => unknown; savePrices: (prices: unknown) => void };
   /** Gmail over IMAP: status (address only, never the password), connect (tests the login first), disconnect. */
   gmail?: Pick<GmailService, "status" | "connect" | "disconnect"> & Partial<Pick<GmailService, "setScope" | "counts" | "estimate">>;
+  /** WhatsApp linked device: status, QR code while linking, chat choices, disconnect (all laptop only but the status). */
+  whatsapp?: Pick<WhatsAppService, "status" | "connect" | "cancelLink" | "disconnect" | "qrSvg" | "chats" | "setChats"> & Partial<Pick<WhatsAppService, "start" | "stop">>;
   /** New releases on GitHub (cached; checked 6-hourly in the background) and the laptop-only self-update. */
   updates?: Pick<Updates, "status" | "check" | "apply">;
 }
@@ -119,6 +122,10 @@ const deps: PortalDeps = {
   ai: createAiService(),
   claude: createClaudeAccounts(),
   gmail: createGmailService({ ownerEmails: () => loadAppConfig().owner.emails, known: id => !!cachedState().processed?.[id] }),
+  whatsapp: createWhatsAppService({ unlink: async () => {
+    const p = Bun.spawn([process.execPath, join(import.meta.dir, "cli.ts"), "whatsapp-unlink"], { cwd: join(import.meta.dir, ".."), stdout: "ignore", stderr: "ignore", stdin: "ignore", windowsHide: true });
+    return (await p.exited) === 0;
+  } }),
   backfill: { windows: () => readWindows(), set: (feed, days) => setWindow(feed, days, loadConfig()), estimate: feed => estimator.estimate(feed), reset: feed => estimator.reset(feed) },
   feedSchedule: { read: () => readSchedule(), set: saveInterval },
   usage: { report: range => usageReport(readLogLines(logsDir, rangeStart(range) ?? ""), loadState(), loadConfig(), range), savePrices: prices => { savePrices(prices); } },
@@ -314,8 +321,17 @@ export function createPortal(port = portalPort(), services: PortalDeps = deps) {
     try {
       if (req.method === "GET") {
         if (url.pathname === "/api/status") return json({ ...publicStatus(services.config(), services.state(), services.connected(), services.running(), await schedule(), intervals()),
-          runs: limitRuns(services.history?.() ?? { total: 0, succeeded: 0, failed: 0, skipped: 0, entries: [] }), backup: await backup(), ai: await services.ai?.status() ?? null, remote: services.remote ? withoutLogs({ ...services.remote.status(), devices: sessions.count() }, isPublic) : null, claude: services.claude?.status() ?? null, claudeAccounts: services.claude?.list() ?? [], gmail: services.gmail?.status() ?? null, dream: services.dream?.status() ?? null, chatgptChats: { enabled: chatgptChatsEnabled() }, updates: publicUpdates(services.updates?.status() ?? null, isPublic), backfill: windowSummary(), vault: basename(services.config().brainPath), notice, ...identity(appInfo()) });
+          runs: limitRuns(services.history?.() ?? { total: 0, succeeded: 0, failed: 0, skipped: 0, entries: [] }), backup: await backup(), ai: await services.ai?.status() ?? null, remote: services.remote ? withoutLogs({ ...services.remote.status(), devices: sessions.count() }, isPublic) : null, claude: services.claude?.status() ?? null, claudeAccounts: services.claude?.list() ?? [], gmail: services.gmail?.status() ?? null, whatsapp: services.whatsapp?.status() ?? null, dream: services.dream?.status() ?? null, chatgptChats: { enabled: chatgptChatsEnabled() }, updates: publicUpdates(services.updates?.status() ?? null, isPublic), backfill: windowSummary(), vault: basename(services.config().brainPath), notice, ...identity(appInfo()) });
         if (Object.hasOwn(SHELL, url.pathname)) return shellFile(url.pathname);
+        // WhatsApp: the QR code reads every chat and the chat list names private chats, so both stay on the laptop.
+        if (url.pathname.startsWith("/api/whatsapp/") && services.whatsapp) {
+          if (isPublic) return json({ error: "Open WhatsApp settings on the laptop." }, 403);
+          if (url.pathname === "/api/whatsapp/qr") {
+            const svg = await services.whatsapp.qrSvg();
+            return svg ? new Response(svg, { headers: { ...headers, "content-type": "image/svg+xml", "cache-control": "no-store" } }) : json({ error: "No QR code right now." }, 404);
+          }
+          if (url.pathname === "/api/whatsapp/chats") return json({ chats: services.whatsapp.chats() });
+        }
         if (url.pathname === "/api/backfill/estimate" && services.backfill) {
           // Never part of the status poll: the dialog asks for it, and results are cached for 10 minutes.
           const feed = url.searchParams.get("feed") ?? "";
@@ -423,6 +439,21 @@ export function createPortal(port = portalPort(), services: PortalDeps = deps) {
         try { services.usage.savePrices(await req.json()); } catch (e) { return json({ error: e instanceof Error ? e.message : "Prices could not be saved." }, 400); }
         usageCache.clear();
         return json({ message: "Prices saved. Spend estimates use them from now on." });
+      }
+      if (url.pathname.startsWith("/api/whatsapp/") && services.whatsapp) { // laptop only (not in PUBLIC_POSTS)
+        if (Number(req.headers.get("content-length") ?? 0) > 200_000) return json({ error: "Request too large" }, 413);
+        const w = services.whatsapp, body = await req.json().catch(() => ({})) as { chats?: unknown };
+        if (url.pathname === "/api/whatsapp/connect") { w.connect(); return json({ message: "Scan the QR code with WhatsApp on your phone." }); }
+        if (url.pathname === "/api/whatsapp/cancel") { w.cancelLink(); return json({ message: "Linking stopped." }); }
+        if (url.pathname === "/api/whatsapp/chats") {
+          try { const on = w.setChats(body.chats); return json({ message: on.length ? `Saved. ${on.length} ${on.length === 1 ? "chat becomes" : "chats become"} notes from the next run.` : "Saved. No chat becomes notes." }); }
+          catch (e) { return json({ error: e instanceof Error ? e.message : "Could not save." }, 400); }
+        }
+        if (url.pathname === "/api/whatsapp/disconnect") {
+          const r = await w.disconnect();
+          return json({ message: `WhatsApp disconnected and its local messages deleted.${r.unlinked ? "" : " Also remove \"Third Brain\" under Linked devices in WhatsApp on your phone."} Existing notes stay in your brain.` });
+        }
+        return json({ error: "Not found" }, 404);
       }
       if (url.pathname.startsWith("/api/gmail/") && services.gmail) { // laptop only (not in PUBLIC_POSTS): the app password is typed here
         if (Number(req.headers.get("content-length") ?? 0) > 8192) return json({ error: "Request too large" }, 413);
@@ -676,12 +707,13 @@ if (import.meta.main) {
   deps.remote?.start(); // the one GBrain server (+ Cloudflare tunnel when remote access is on)
   deps.claude?.start(); // keeps each connected Claude.ai account's window running (minimised)
   (deps.dream as Dream | undefined)?.start();
+  deps.whatsapp?.start?.(); // reconnects a linked WhatsApp device (its own process)
   updates.start(); // this install's version now; GitHub's latest release after 60 s, then every 6 hours // nightly: related notes, topics, GBrain links + embeddings (src/dream.ts)
   // Build the notes index now, so the first visit to the Notes page does not wait ~1 s for the first scan.
   setTimeout(() => {
     try { const index = notesIndexFor(loadConfig().brainPath); for (const source of NOTE_SOURCES) queryNotes(index, { source, q: "", from: "", to: "", page: 1, pageSize: 1 }); }
     catch { /* the page builds it on demand */ }
   }, 2_000);
-  for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => { deps.remote?.stop(); process.exit(0); });
+  for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => { deps.remote?.stop(); deps.whatsapp?.stop?.(); process.exit(0); });
   console.log(`Brain connector portal: http://localhost:${server.port}/ (loopback only)`);
 }

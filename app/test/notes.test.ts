@@ -64,7 +64,7 @@ test("notes index lists each source's notes, newest first, with title and summar
   write("inbox/meetings/2026-10/m.md", "Kickoff", "2026-10-15T08:00:00Z");
   expect(listNotes(root, "teams-chat").map(n => n.title)).toEqual(["Chat B", "Chat A"]);
   expect(listNotes(root, "teams-chat")[0]).toMatchObject({ path: "inbox/teams/chats/2026-10/b.md", summary: "What happened.", source: "teams-chat" });
-  expect(countNotes(root)).toEqual({ "email": 0, "teams-chat": 2, "teams-channel": 0, "meeting": 1, "ai-chat": 0, "chatgpt-chat": 0, "gmail": 0 });
+  expect(countNotes(root)).toEqual({ "email": 0, "teams-chat": 2, "teams-channel": 0, "meeting": 1, "ai-chat": 0, "chatgpt-chat": 0, "gmail": 0, "whatsapp": 0 });
   const { noteSource, matchesNote } = await import("../portal/view.js");
   expect(noteSource("inbox/meetings/2026-10/m.md").tag).toBe("Meeting");
   expect(matchesNote({ title: "IAQ workshop", summary: "RM 8,000" }, "rm 8")).toBe(true);

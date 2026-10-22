@@ -32,7 +32,7 @@ export interface Item {
   ref?: string;
 }
 
-export type Source = "email" | "teams-chat" | "teams-channel" | "meeting" | "ai-chat" | "chatgpt-chat" | "gmail";
+export type Source = "email" | "teams-chat" | "teams-channel" | "meeting" | "ai-chat" | "chatgpt-chat" | "gmail" | "whatsapp";
 
 export interface Dropped {
   item: Item;

@@ -116,6 +116,26 @@
       </div>
     </div>
 
+    <section class="panel card" data-connector="whatsapp" aria-labelledby="wa-chats-title" hidden>
+      <div class="card-head"><h2 id="wa-chats-title">Chats to include</h2><span class="muted small" id="wa-chats-count"></span></div>
+      <p class="hint remote-only">Choose the chats on the laptop.</p>
+      <form id="wa-chats-form" class="laptop-only">
+        <p class="hint">Only the chats you turn on become notes. Keep family and private chats off. The list shows every chat with stored messages, newest first.</p>
+        <div class="toolbar">
+          <div class="toolbar-grow"><label class="sr-only" for="wa-chat-search">Search chats</label><input id="wa-chat-search" type="search" placeholder="Search chats" autocomplete="off"></div>
+          <div class="chips" role="group" aria-label="Show">
+            <button type="button" class="chip" data-wa-filter="all" aria-pressed="true">All</button>
+            <button type="button" class="chip" data-wa-filter="group" aria-pressed="false">Groups</button>
+            <button type="button" class="chip" data-wa-filter="direct" aria-pressed="false">One-to-one</button>
+            <button type="button" class="chip" data-wa-filter="on" aria-pressed="false">Turned on</button>
+          </div>
+        </div>
+        <ul class="list wa-chats" id="wa-chats"></ul>
+        <p class="hint" id="wa-chats-more" hidden></p>
+        <div class="actions end"><span class="muted small" id="wa-chats-dirty"></span><button class="btn" type="submit" id="wa-chats-save" disabled>Save</button></div>
+      </form>
+    </section>
+
     <section class="panel card" data-connector="gmail" aria-labelledby="gmail-scope-title" hidden>
       <div class="card-head"><h2 id="gmail-scope-title">What to include</h2><button class="btn btn-quiet laptop-only" type="button" id="gmail-count">Count</button></div>
       <p class="remote-only" id="gmail-scope-summary"></p>
@@ -516,6 +536,21 @@
     <p class="alert" id="gmail-error" role="alert" hidden></p>
     <div class="actions end"><button class="btn btn-quiet" type="button" id="gmail-cancel">Cancel</button><button class="btn" type="submit" id="gmail-submit">Test and connect</button></div>
   </form>
+</dialog>
+<dialog id="wa-dialog" class="panel dialog dialog-narrow" aria-labelledby="wa-title" aria-describedby="wa-lede">
+  <div class="dialog-form">
+    <header class="window-head"><h2 id="wa-title">Link WhatsApp</h2>
+      <p class="muted small" id="wa-lede">This computer becomes a linked device of your WhatsApp, like WhatsApp Web. It only reads: it never sends messages and never marks them as read. You choose which chats become notes after linking.</p></header>
+    <p class="callout" data-tone="warn">WhatsApp does not permit unofficial linked tools like this one. A ban of the account is possible. If you are not sure, link a second number first.</p>
+    <ol class="signin-steps">
+      <li>Open <strong>WhatsApp</strong> on your phone.</li>
+      <li>Open <strong>Settings</strong> (iPhone) or the <strong>⋮ menu</strong> (Android), then <strong>Linked devices</strong>.</li>
+      <li>Tap <strong>Link a device</strong> and scan this code.</li>
+    </ol>
+    <div class="wa-qr" id="wa-qr"><img id="wa-qr-img" alt="QR code to link WhatsApp" hidden></div>
+    <p class="hint" id="wa-state" role="status">Making a QR code…</p>
+    <div class="actions end"><button class="btn btn-quiet" type="button" id="wa-cancel">Cancel</button></div>
+  </div>
 </dialog>
 </body>
 </html>

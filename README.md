@@ -63,7 +63,8 @@ Windows, PowerShell. The full guide, with each screen and fixes for common error
 
 - **Connectors:** Outlook mail (with attachment text), Gmail (Primary, Sent and Important mail by default, or the tabs and labels you choose;
   over IMAP with an app password, no Google Cloud project), Teams chats and channels, meetings (transcripts), Claude.ai chats (several accounts,
-  projects, documents), ChatGPT chats (projects, canvas documents).
+  projects, documents), ChatGPT chats (projects, canvas documents), WhatsApp chats you choose (read-only linked device;
+  unofficial, see [operations](docs/operations.md#whatsapp)).
 - **Note writer:** your choice of ChatGPT subscription (experimental), OpenAI API or Claude API.
 - **Safety:** credential check before any AI sees text, personal-matter skip rule, nothing leaves your machine
   unless you turn on remote access or a backup push.

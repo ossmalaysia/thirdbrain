@@ -13,7 +13,7 @@ const feeds = { email: ["inbox", "sentitems"], teams: ["teams:chats", "teams:cha
 const tmpFile = () => join(mkdtempSync(join(tmpdir(), "sched-")), "feed-schedule.json");
 
 test("defaults: mail and Teams 15 minutes, meetings 30, Claude.ai accounts 1 hour, ChatGPT 2 hours", () => {
-  expect(DEFAULT_INTERVALS).toEqual({ outlook: 15, "teams-chats": 15, "teams-channels": 15, meetings: 30, chatgpt: 120, gmail: 15 });
+  expect(DEFAULT_INTERVALS).toEqual({ outlook: 15, "teams-chats": 15, "teams-channels": 15, meetings: 30, chatgpt: 120, gmail: 15, whatsapp: 15 });
   expect(resolvedIntervals({}, ["personal", "work"])).toMatchObject({ meetings: 30, chatgpt: 120, "claude:personal": 60, "claude:work": 60 });
   expect(["inbox", "teams:chats", "teams:channels", "meetings", "ai:claude", "ai:claude:work", "ai:chatgpt"].map(scheduleKey))
     .toEqual(["outlook", "teams-chats", "teams-channels", "meetings", "claude:personal", "claude:work", "chatgpt"]);

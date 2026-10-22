@@ -25,7 +25,7 @@ test("status sends every connector's interval (saved or default) and when each w
   try {
     const s = await (await fetch(f.base + "/api/status")).json();
     expect(s.feedSchedule).toEqual({
-      intervals: { outlook: 15, "teams-chats": 15, "teams-channels": 15, meetings: 60, chatgpt: 120, gmail: 15, "claude:personal": 60, "claude:work": 60 },
+      intervals: { outlook: 15, "teams-chats": 15, "teams-channels": 15, meetings: 60, chatgpt: 120, gmail: 15, whatsapp: 15, "claude:personal": 60, "claude:work": 60 },
       lastPulledAt: { chatgpt: "2026-10-19T08:00:00.000Z" } });
   } finally { f.server.stop(true); }
 });

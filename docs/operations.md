@@ -123,6 +123,34 @@ Owner: the connected address counts as yours (mail from it is your own words, an
 It is recorded in `owner-identity.json` in the state directory, next to `owner.emails` from `config.json`
 (which is not edited), and it stays there after a disconnect so existing notes keep treating it as you.
 
+## WhatsApp
+
+WhatsApp chats come in through a **linked device**, the same way as WhatsApp Web, with the open-source
+[Baileys](https://github.com/WhiskeySockets/Baileys) library. There is no official API for personal WhatsApp
+accounts, so this connector is **unofficial**: WhatsApp's terms do not permit it, and an account that uses it can be
+banned. If you are not sure, link a second number first.
+
+How it works:
+
+- **Add connector -> WhatsApp** shows a QR code. On the phone open WhatsApp -> Settings (iPhone) or the menu
+  (Android) -> **Linked devices** -> **Link a device** and scan it. The code changes every few seconds.
+- The portal runs the link in its own process (`cli.ts whatsapp-worker`) and starts it again after a restart.
+- It is **read-only**: it never sends messages, presence or read receipts.
+- Text messages of all chats are stored in `whatsapp/whatsapp.db` in the state folder, outside the vault. The message
+  text and the sign-in keys are encrypted with the state folder's key; chat and contact names are not, so the chat list
+  can show them. Photos, videos, voice messages and documents are stored as a marker such as `[photo]`.
+- On the WhatsApp page, **Chats to include** chooses the chats that become notes. None is on at first. Only those
+  chats reach the note writer: one note per chat per month in `inbox/whatsapp/chats/`, with the usual secret check,
+  decision model, entities and related notes. Phone numbers are never written into notes.
+- WhatsApp sends a part of the history when you link (usually the recent months). Older history is not available
+  through a linked device.
+- Your phone must connect to the internet at least every 14 days, or WhatsApp signs out all linked devices.
+- **Disconnect** removes this computer from the phone's Linked devices list and deletes the local store. Notes
+  already written stay.
+
+If the WhatsApp card shows **Signed out on the phone**, the device was removed on the phone (or by WhatsApp): click
+**Link again**.
+
 ## Claude.ai chats
 
 Connectors → **Connect Claude.ai** opens a dedicated Microsoft Edge window (profile `%USERPROFILE%\.brain-mailsync\claude-browser`, DevTools on 127.0.0.1:9333). Sign in to claude.ai there once; the portal detects it (`/api/organizations` = 200, as ossmalaysia/claude-sync does), minimises the window and keeps it running while connected (relaunching it minimised after a reboot). Each sync connects to that window, lists chats newest first in every organisation, stops at the last seen `updated_at`, reads only changed chats (the on-screen branch), and the pipeline turns new messages into `inbox/ai/claude/` notes. First sync: 30 days (`MAILSYNC_AI_SINCE_DAYS`). Plain HTTP is not possible (Cloudflare challenge), and the endpoints are undocumented: a site change shows as a Claude.ai problem on Connectors while email and Teams keep syncing. **Disconnect** closes the window and deletes its profile.
