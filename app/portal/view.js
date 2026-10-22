@@ -26,7 +26,7 @@ export function syncState(s, { paused, unavailable, error }) {
 // Per-connector "Sync every" (src/feed-schedule.ts has the rules; these values mirror it for display, and are the
 // defaults while an older portal build sends no feedSchedule). The worker itself still ticks every 15 minutes.
 export const SYNC_INTERVALS = [[15, '15 minutes'], [30, '30 minutes'], [60, '1 hour'], [120, '2 hours'], [180, '3 hours'], [360, '6 hours'], [720, '12 hours'], [1440, 'Once a day']];
-const SYNC_DEFAULTS = { outlook: 15, 'teams-chats': 15, 'teams-channels': 15, meetings: 30, chatgpt: 120, gmail: 15 }, CLAUDE_SYNC_DEFAULT = 60;
+const SYNC_DEFAULTS = { outlook: 15, 'teams-chats': 15, 'teams-channels': 15, meetings: 30, chatgpt: 120, gmail: 15, whatsapp: 15 }, CLAUDE_SYNC_DEFAULT = 60;
 const TICK_MS = 15 * 60_000, GRACE_MS = 10 * 60_000; // docker/scheduler.mjs INTERVAL_MS; feed-schedule.ts GRACE_MS
 export const intervalLabel = m => SYNC_INTERVALS.find(([v]) => v === m)?.[1] ?? `${m} minutes`;
 export const everyPhrase = m => m === 1440 ? 'once a day' : m === 60 ? 'every hour' : m % 60 === 0 ? `every ${m / 60} hours` : `every ${m} minutes`;
@@ -143,6 +143,7 @@ export const ICONS = {
   mail: ['M3.5 6.5h17v11h-17z', 'M3.5 7.5l8.5 6 8.5-6'],
   at: ['M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z', 'M15.5 8.5v4.5a2.5 2.5 0 0 0 5 0V12a8.5 8.5 0 1 0-3.4 6.8'], // an email address sign, not a product mark
   chats: ['M3.5 5h11v8H8l-4.5 3.5z', 'M17 9h3.5v10l-3-2.5H10V15'],
+  phone: ['M12 3.5a8.5 8.5 0 0 0-7.3 12.8L3.5 20.5l4.3-1.1A8.5 8.5 0 1 0 12 3.5z', 'M9.2 8.5c0 3.4 2.9 6.3 6.3 6.3l.9-1.6-2-.9-.9.9a4.4 4.4 0 0 1-2.7-2.7l.9-.9-.9-2z'], // a chat bubble with a handset, not a product mark
   channel: ['M9.5 4l-2 16', 'M16.5 4l-2 16', 'M4.5 9h15', 'M3.5 15h15'],
   calendar: ['M4 6h16v14H4z', 'M4 10.5h16', 'M8.5 3.5v4', 'M15.5 3.5v4', 'M8 14.5h3'],
   spark: ['M12 3.5v5', 'M12 15.5v5', 'M3.5 12h5', 'M15.5 12h5', 'M6 6l3.2 3.2', 'M14.8 14.8L18 18', 'M18 6l-3.2 3.2', 'M9.2 14.8L6 18'],
@@ -168,6 +169,8 @@ export const CONNECTORS = [
     about: 'One note per finished meeting in inbox/meetings/: the transcript when the meeting was recorded, otherwise the invite and the meeting chat. Uses the Microsoft 365 sign-in shared with Outlook.' },
   { id: 'gmail', name: 'Gmail', mark: '@', icon: 'at', notes: 'gmail', feed: 'gmail', hue: 'meet', actions: ['gmailDisconnect'], desc: 'The Gmail mail you choose to include',
     about: 'Reads the mail you choose under What to include (by default Primary, Sent and Important mail) {every} over IMAP with an app password (no Google Cloud project). Useful threads become notes in inbox/email/gmail/; spam, bulk mail and anything that looks like a secret are left out. Mail from this address counts as yours.' },
+  { id: 'whatsapp', name: 'WhatsApp', mark: 'W', icon: 'phone', notes: 'whatsapp', feed: 'whatsapp', hue: 'meet', actions: ['whatsappDisconnect'], desc: 'The WhatsApp chats you choose',
+    about: 'Linked to WhatsApp on your phone, like WhatsApp Web, and read-only: it never sends messages and never marks them as read. Only the chats you turn on under Chats to include become notes, {every}, one note per chat per month in inbox/whatsapp/chats/. Text only: photos and voice messages show as a marker. Unofficial: WhatsApp does not permit linked tools like this, so a ban of the account is possible.' },
   { id: 'claude', name: 'Claude.ai chats', mark: 'C', icon: 'spark', notes: 'ai-chat', feed: 'ai:claude', hue: 'claude', actions: [], desc: 'Conversations you have on claude.ai',
     about: '{Every}, chats you started or continued on claude.ai are read and distilled into notes in inbox/ai/claude/: what you decided, produced or still have to do.' },
   { id: 'chatgpt', name: 'ChatGPT chats', mark: 'G', icon: 'bubble', notes: 'chatgpt-chat', feed: 'ai:chatgpt', hue: 'brand', actions: ['chatgptChatsDisable'], desc: 'Conversations you have on chatgpt.com',
@@ -175,6 +178,8 @@ export const CONNECTORS = [
   { id: 'writer', name: 'Note writer', mark: 'AI', icon: 'pen', hue: 'brand', href: '#settings', desc: 'The AI that turns each item into a note' },
 ];
 const pill = (text, tone) => ({ text, tone });
+const WHATSAPP_PHASES = { linking: ['Waiting for QR scan', 'active'], connecting: ['Connecting', 'active'], connected: ['Connected', 'ok'],
+  offline: ['Offline', 'warn'], loggedOut: ['Signed out on the phone', 'warn'], off: ['Not linked', 'neutral'] };
 const firstLine = text => String(text).split('\n')[0];
 
 /** A chat feed's history window from status.backfill; null on a portal build without history windows. */
@@ -233,6 +238,13 @@ export function connectorsModel(s, counts = {}) {
         pill: !g ? pill('Checking', 'neutral') : refused ? pill('Needs a new app password', 'warn') : error ? pill('Error', 'error')
           : s.busy ? pill('Syncing', 'active') : paused ? pill('Paused', 'neutral') : pill('Connected', 'ok') };
     }
+    if (def.id === 'whatsapp') {
+      const w = s.whatsapp, phase = w?.phase ?? 'off', relink = phase === 'loggedOut' || phase === 'off';
+      return { error: phase === 'loggedOut' ? 'WhatsApp on the phone removed this linked device. Link it again to continue.' : error || (phase === 'offline' ? w?.lastError ?? '' : ''),
+        account: w?.name ?? 'WhatsApp', added: !!w?.added, primary: relink ? 'whatsappLink' : null,
+        actions: relink ? ['whatsappDisconnect', 'whatsappLink'] : ['whatsappDisconnect'],
+        pill: !w ? pill('Checking', 'neutral') : phase === 'connected' && !w.chatsOn ? pill('Choose chats', 'warn') : pill(...(WHATSAPP_PHASES[phase] ?? WHATSAPP_PHASES.off)) };
+    }
     if (def.id === 'writer') {
       const g = ai?.chatgpt, ready = provider === 'codex' ? g?.signedIn || g?.cliSignedIn : !!ai?.keys?.[provider];
       return { error: '', account: provider === 'codex' ? g?.email ?? 'ChatGPT subscription' : `${s.settings.extractor} key`,
@@ -245,7 +257,7 @@ export function connectorsModel(s, counts = {}) {
         : s.busy ? pill('Syncing', 'active') : paused ? pill('Paused', 'neutral') : pill('Connected', 'ok') };
   }
 
-  return CONNECTORS.map(def => ({ def, st: state(def) })).filter(({ def, st }) => !['claude', 'chatgpt', 'gmail'].includes(def.id) || st.added).map(({ def, st }) => {
+  return CONNECTORS.map(def => ({ def, st: state(def) })).filter(({ def, st }) => !['claude', 'chatgpt', 'gmail', 'whatsapp'].includes(def.id) || st.added).map(({ def, st }) => {
     const count = def.notes ? counts[def.notes] : undefined;
     // Claude.ai: one interval per account (set on its row); the connector's next run is the soonest account's.
     const rows = def.id === 'claude' ? st.accounts.map(a => a.schedule) : [];
@@ -256,6 +268,8 @@ export function connectorsModel(s, counts = {}) {
     const every = spans.length === 1 ? everyPhrase(spans[0]) : "on each account's own schedule";
     const facts = def.id === 'writer' ? [] : [['Notes in vault', count == null ? '—' : number(count)], ['Last synced', when(s.lastSuccessAt)], ['Next run', nextRun(schedule ?? soonest)]];
     if (def.id === 'gmail') facts.push(['Mail read', gmailScopeModel(s.gmail).summary.replace(/\.$/, '')], ['App password', s.gmail?.passwordSaved ? 'Saved, encrypted on this computer' : 'Not saved']);
+    if (def.id === 'whatsapp') facts.push(['Chats to include', `${number(s.whatsapp?.chatsOn ?? 0)} chosen`],
+      ['History from the phone', !s.whatsapp?.history ? 'Arrives in the first minutes after linking' : `${number(s.whatsapp.history.added)} messages${s.whatsapp.history.progress != null && s.whatsapp.history.progress < 100 ? ` (${s.whatsapp.history.progress}%)` : ''}`]);
     if (def.id === 'outlook') facts.push(['History scanned', `${s.counts.scannedFolders}${s.counts.totalFolders ? ` of ${s.counts.totalFolders}` : ''} folders, ${s.settings.lookbackDays} days back`]);
     // Who/what this connector runs as, shown under the name on every card.
     const ident = def.id === 'writer' ? `${s.settings.extractor} · ${s.settings.model === 'CLI default' ? 'default model' : s.settings.model}` : st.account;
@@ -275,6 +289,7 @@ export const CATALOG = [
   { id: 'm365', name: 'Microsoft 365', mark: 'O', icon: 'apps', hue: 'outlook', desc: 'Outlook email, Teams chats and channels, and meetings, with one sign-in.' },
   { id: 'chatgpt', name: 'ChatGPT chats', mark: 'G', icon: 'bubble', hue: 'brand', desc: 'Conversations from your ChatGPT account, tagged by project, with canvas documents. Uses the ChatGPT sign-in from Settings.' },
   { id: 'gmail', name: 'Gmail', mark: '@', icon: 'at', hue: 'meet', desc: 'Primary, Sent and Important mail from a Gmail account, with attachments (you choose what to include). Signs in with an app password; no Google Cloud project.' },
+  { id: 'whatsapp', name: 'WhatsApp', mark: 'W', icon: 'phone', hue: 'meet', desc: 'The WhatsApp chats you choose, read-only, through a linked device (scan a QR code, like WhatsApp Web). Unofficial: a ban of the account is possible.' },
   { id: 'claude-code', name: 'Claude Code sessions', mark: '>_', icon: 'terminal', hue: 'brand', desc: 'Sessions you run on this laptop.', soon: true },
 ];
 export function catalogModel(s) {
@@ -295,6 +310,12 @@ export function catalogModel(s) {
         action: on ? null : g?.signedIn ? 'chatgptChatsEnable' : 'chatgptLogin', laptopOnly: !g?.signedIn,
         accounts: g?.signedIn ? [{ email: g.email ?? 'ChatGPT account', pill: on ? pill('Syncing chats', 'ok') : pill('Signed in', 'neutral') }] : [],
         note: g?.signedIn ? '' : 'Sign in with ChatGPT first (the same sign-in the note writer can use).' };
+    }
+    if (def.id === 'whatsapp') {
+      const w = s.whatsapp, on = !!w?.added;
+      return { ...def, href: on ? '#/connectors/whatsapp' : null, pill: on ? pill('Added', 'ok') : pill('Not added', 'neutral'),
+        action: on ? null : 'whatsappLink', laptopOnly: true, accounts: on && w.name ? [{ email: w.name, pill: pill(WHATSAPP_PHASES[w.phase]?.[0] ?? 'Linked', 'ok') }] : [],
+        note: on ? '' : 'Needs WhatsApp on your phone to scan a QR code. Your phone must connect at least every 14 days.' };
     }
     if (def.id === 'gmail') {
       const g = s.gmail, on = !!g?.connected;
@@ -495,6 +516,8 @@ export function viewModel(s, pending = false, noteCounts = {}) {
       ...vault.controls, ...ai.controls, ...remote.controls, ...dream.controls, ...updates.controls, ...claudeControls(s.claude, pending), ...chatgptChatControls(s, pending),
       gmailAdd: { label: s.gmail?.connected ? 'Connect again' : 'Add Gmail', disabled: pending || !s.gmail },
       gmailDisconnect: { label: 'Disconnect', disabled: pending || !s.gmail?.connected },
+      whatsappLink: { label: s.whatsapp?.phase === 'loggedOut' ? 'Link again' : 'Link WhatsApp', disabled: pending || !s.whatsapp || ['linking', 'connecting', 'connected'].includes(s.whatsapp.phase) },
+      whatsappDisconnect: { label: 'Disconnect', disabled: pending || !s.whatsapp?.added },
       connect: { label: s.connected ? 'Reconnect' : 'Connect Microsoft 365', disabled: pending || s.busy || !s.configured },
       sync: { label: s.busy ? 'Syncing…' : 'Sync now', disabled: pending || s.busy || s.needsLogin || paused || unavailable },
       schedule: { label: paused ? 'Resume' : 'Pause', disabled: pending, path: paused ? '/api/resume' : '/api/pause' },
@@ -514,6 +537,7 @@ export function viewModel(s, pending = false, noteCounts = {}) {
 export const NOTE_SOURCES = [
   { id: 'email', label: 'Email', tag: 'Email', prefix: 'inbox/email/threads/' }, // Outlook; Gmail has its own folder
   { id: 'gmail', label: 'Gmail', tag: 'Gmail', prefix: 'inbox/email/gmail/' },
+  { id: 'whatsapp', label: 'WhatsApp', tag: 'WhatsApp', prefix: 'inbox/whatsapp/' },
   { id: 'teams-chat', label: 'Teams chats', tag: 'Chat', prefix: 'inbox/teams/chats/' },
   { id: 'teams-channel', label: 'Teams channels', tag: 'Channel', prefix: 'inbox/teams/channels/' },
   { id: 'meeting', label: 'Meetings', tag: 'Meeting', prefix: 'inbox/meetings/' },
@@ -796,5 +820,23 @@ export function gmailScopeModel(g, { counts = null, countsError = '', estimate =
     save: { label: 'Save', disabled: pending || none || !changed },
     count: { label: counts ? 'Count again' : 'Count', disabled: pending },
     none, changed, scope: { ...Object.fromEntries(GMAIL_SCOPE_CHOICES.map(([k]) => [k, !!cur[k]])), labels: [...labels] },
+  };
+}
+
+/** WhatsApp Chats to include: search, filter chips and unsaved choices (`draft`: a Set of chat ids, or null = as saved). */
+export function waChatsModel(chats, { q = '', filter = 'all', draft = null, limit = 150 } = {}) {
+  const isOn = c => draft ? draft.has(c.jid) : c.on;
+  const words = q.trim().toLowerCase();
+  const match = chats.filter(c => (filter === 'all' || (filter === 'on' ? isOn(c) : c.kind === filter)) && (!words || (c.name ?? '').toLowerCase().includes(words)));
+  const changed = draft ? chats.filter(c => draft.has(c.jid) !== c.on).length : 0;
+  const onCount = chats.filter(isOn).length;
+  return {
+    rows: match.slice(0, limit).map(c => ({ jid: c.jid, on: isOn(c), name: c.name ?? (c.kind === 'group' ? 'Unnamed group' : 'Unnamed chat'),
+      meta: `${c.kind === 'group' ? 'Group' : 'One-to-one'} · ${number(c.count)} ${c.count === 1 ? 'message' : 'messages'} · last ${when(c.lastAt)}` })),
+    more: match.length > limit ? `${number(match.length - limit)} more. Search to find them.` : '',
+    count: `${number(onCount)} of ${number(chats.length)} turned on`,
+    dirty: changed ? `${changed} unsaved ${changed === 1 ? 'change' : 'changes'}` : '',
+    save: { disabled: !changed },
+    empty: !chats.length ? 'No chats yet. Messages from the phone arrive in the first minutes after linking.' : !match.length ? 'No chat matches.' : '',
   };
 }

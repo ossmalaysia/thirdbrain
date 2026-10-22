@@ -73,16 +73,19 @@ Never include passwords, codes, account/card/ID numbers, or any credential. Neve
 
 const sourceLabel = (source: string, who: string) => ({ "email": "email thread", "teams-chat": "Teams chat",
   "teams-channel": "Teams channel thread", "meeting": "meeting", "ai-chat": `conversation between ${who} and Claude (claude.ai)`,
-  "chatgpt-chat": `conversation between ${who} and ChatGPT (chatgpt.com)`, "gmail": "email thread (Gmail)" } as Record<string, string>)[source];
+  "chatgpt-chat": `conversation between ${who} and ChatGPT (chatgpt.com)`, "gmail": "email thread (Gmail)",
+  "whatsapp": `WhatsApp chat of ${who} (one month of messages; the subject names the chat)` } as Record<string, string>)[source];
+/** "Name <email>", or the name alone when the source has no addresses (WhatsApp). */
+const person = (p: { name: string; email: string }) => p.email ? `${p.name} <${p.email}>` : p.name;
 
 export function buildPrompt(thread: Thread, owner: PromptOwner = {}): string {
   const source = thread.items[0]?.source ?? "email", { who } = ownerWords(owner);
   const msgs = thread.items.map((m, i) => [
     source === "meeting" ? `### Meeting record ${i + 1}` : `### Message ${i + 1} (${m.folder === "sentitems" ? `sent by ${who}` : "received"})`,
     `Date: ${m.at}`,
-    `From: ${m.from.name} <${m.from.email}>`,
-    `To: ${m.to.map(p => `${p.name} <${p.email}>`).join(", ")}`,
-    m.cc.length ? `Cc: ${m.cc.map(p => `${p.name} <${p.email}>`).join(", ")}` : "",
+    `From: ${person(m.from)}`,
+    m.to.length || source !== "whatsapp" ? `To: ${m.to.map(person).join(", ")}` : "",
+    m.cc.length ? `Cc: ${m.cc.map(person).join(", ")}` : "",
     `Subject: ${m.subject}`,
     "",
     m.text,

@@ -5,6 +5,11 @@ All notable changes to Third Brain. Versions follow [semantic versioning](https:
 
 ## Unreleased
 
+- **WhatsApp connector (unofficial):** a read-only linked device (QR code, like WhatsApp Web; Baileys) stores text
+  messages of all chats encrypted in the state folder; only the chats turned on under **Chats to include** become notes,
+  one per chat per month in `inbox/whatsapp/chats/`. Disconnect unlinks the device and deletes the store.
+- **Microsoft sign-in:** when Microsoft refuses the saved sign-in, the portal shows Microsoft's reason and code and
+  since when; the desktop app shows one "Microsoft sign-in needed" notice instead of one notice per failed run.
 - **Install:** README Quick start and a full [install guide](docs/install.md) with troubleshooting;
   `scripts/windows/setup-scheduler.ps1` sets up the Docker sync schedule; `config init --client-id --tenant-id`;
   `THIRDBRAIN_PORT` changes the portal port; `install-gbrain.ps1` no longer adds a stdio GBrain server per agent

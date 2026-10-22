@@ -8,11 +8,12 @@ import { FEEDS } from "./adapters/teams.ts";
 import { AI_FEED } from "./adapters/claude-web.ts";
 import { CHATGPT_FEED } from "./adapters/chatgpt-web.ts";
 import { GMAIL_FEED } from "./adapters/gmail-imap.ts";
+import { WHATSAPP_FEED } from "./adapters/whatsapp-feed.ts";
 
 export const SCHEDULE_FILE = join(STATE_DIR, "feed-schedule.json");
 export const SYNC_INTERVALS = [15, 30, 60, 120, 180, 360, 720, 1440] as const;
 /** chatgpt.com allows about one chat read a minute during a big import, so ChatGPT waits longest by default. */
-export const DEFAULT_INTERVALS: Record<string, number> = { outlook: 15, "teams-chats": 15, "teams-channels": 15, meetings: 30, chatgpt: 120, gmail: 15 };
+export const DEFAULT_INTERVALS: Record<string, number> = { outlook: 15, "teams-chats": 15, "teams-channels": 15, meetings: 30, chatgpt: 120, gmail: 15, whatsapp: 15 };
 export const CLAUDE_DEFAULT = 60;
 /** A pull finishes some minutes after its tick. Without this grace a 15-minute feed whose pull ended at :02 would
  *  not be due at :15 (13 minutes later). Less than one tick, so a feed never runs earlier than one tick before its time. */
@@ -26,6 +27,7 @@ export function scheduleKey(feed: string): string {
   if (feed === FEEDS.meetings) return "meetings";
   if (feed === CHATGPT_FEED) return "chatgpt";
   if (feed === GMAIL_FEED) return "gmail";
+  if (feed === WHATSAPP_FEED) return "whatsapp";
   if (feed === AI_FEED) return "claude:personal";
   if (feed.startsWith(`${AI_FEED}:`)) return `claude:${feed.slice(AI_FEED.length + 1)}`;
   return "outlook";

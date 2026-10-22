@@ -32,3 +32,23 @@ export function loadSecret<T>(file: string): T | null {
     return JSON.parse(Buffer.concat([decipher.update(Buffer.from(box.data, "base64")), decipher.final()]).toString("utf8"));
   } catch { return null; }
 }
+
+/** Single values inside a local database (WhatsApp keys and message text), with the secret.key of the database's folder.
+ *  A sealed value is base64 of iv (12) | tag (16) | data; `open` returns null for a tampered or foreign-key value. */
+export function sealer(dbFile: string) {
+  const key = secretKey(dbFile);
+  return {
+    seal(text: string): string {
+      const iv = randomBytes(12), cipher = createCipheriv("aes-256-gcm", key, iv);
+      const data = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
+      return Buffer.concat([iv, cipher.getAuthTag(), data]).toString("base64");
+    },
+    open(sealed: string): string | null {
+      try {
+        const raw = Buffer.from(sealed, "base64"), decipher = createDecipheriv("aes-256-gcm", key, raw.subarray(0, 12));
+        decipher.setAuthTag(raw.subarray(12, 28));
+        return Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString("utf8");
+      } catch { return null; }
+    },
+  };
+}

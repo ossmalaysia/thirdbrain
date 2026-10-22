@@ -2,7 +2,7 @@
 import { ICONS, entityRows, ENTITY_TABS, ENTITY_DIRS, ENTITY_PAGE_SIZE, DUPLICATE_GROUPS_PAGE, pageSlice, groupByOrg, groupDuplicates } from './view.js';
 import { viewModel, productName, RUN_COLUMNS, BACKUP_INTERVALS, noteTitle, obsidianUrl, parseNote, markdownBlocks, NOTE_SOURCES, noteSource, when, CONNECTORS, connectorCards,
   parseNotesState, notesHash, notesApiQuery, datePresets, activePreset, pageItems, showingLine, pageLocally, noteDay, noteTags,
-  windowDialogModel, windowChangeNote, windowLabel, USAGE_RANGES, usageModel, SYNC_INTERVALS, gmailScopeModel } from './view.js';
+  windowDialogModel, windowChangeNote, windowLabel, USAGE_RANGES, usageModel, SYNC_INTERVALS, gmailScopeModel, waChatsModel } from './view.js';
 
 const $ = sel => document.querySelector(sel), $$ = sel => [...document.querySelectorAll(sel)];
 const token = $('meta[name="portal-token"]').content;
@@ -53,6 +53,7 @@ function route() {
   if (current === 'notes') { const st = parseNotesState(sub, qs); notesState = { ...st, source: st.source ?? notesState.source }; loadNotes(); }
   if (navRoute === 'connectors') loadCounts();
   if (openConnector === 'gmail') { gmailScope.shown = ''; openGmailScope(); } else gmailScope.opened = false;
+  if (openConnector === 'whatsapp') loadWaChats(true);
   if (current === 'usage') loadUsage();
   setMenu(false);
   window.scrollTo(0, 0);
@@ -111,7 +112,7 @@ for (const node of $$('.source-icon[data-icon]')) { const svg = iconSvg(node.dat
 const actionButton = (name, quiet = false, laptopOnly = false) => {
   const b = el('button', { type: 'button', className: `btn${quiet ? ' btn-quiet' : ''}${laptopOnly ? ' laptop-only' : ''}`, disabled: true }); b.dataset.action = name; return b;
 };
-const LAPTOP_ONLY = new Set(['claudeConnect', 'claudeDisconnect', 'gmailAdd', 'gmailDisconnect']);
+const LAPTOP_ONLY = new Set(['claudeConnect', 'claudeDisconnect', 'gmailAdd', 'gmailDisconnect', 'whatsappLink', 'whatsappDisconnect']);
 function connectorCard(c) {
   return el('li', { className: 'panel conn-card' },
     el('div', { className: 'conn-top' }, mark(el('span', { className: 'source-icon', ariaHidden: 'true' }), c), pill(c.pill)),
@@ -161,7 +162,78 @@ function renderConnectorDetail(c) {
     $('#accounts-title').textContent = c.accounts.length ? `Accounts (${c.accounts.length})` : 'Accounts';
   }
   if (c.id === 'gmail') { openGmailScope(); renderGmailScope(); }
+  if (c.id === 'whatsapp') loadWaChats(false);
 }
+
+// ── WhatsApp: Chats to include. Loaded on open, then every 20 s while nothing is changed (history keeps arriving).
+// Unsaved choices live in waChats.draft; ticking a box updates only the counts, so focus and scroll stay.
+const waChats = { list: [], q: '', filter: 'all', draft: null, loadedAt: 0, seq: 0 };
+async function loadWaChats(force) {
+  if (remoteView() || (!force && (waChats.draft || Date.now() - waChats.loadedAt < 20_000))) return;
+  waChats.loadedAt = Date.now();
+  const seq = ++waChats.seq;
+  try {
+    const r = await fetch('/api/whatsapp/chats', { cache: 'no-store' }), data = await r.json().catch(() => ({}));
+    if (seq === waChats.seq && r.ok) { waChats.list = data.chats ?? []; renderWaChats(); }
+  } catch { /* the next poll tries again */ }
+}
+function renderWaChatsSummary(m = waChatsModel(waChats.list, waChats)) {
+  $('#wa-chats-count').textContent = m.count;
+  $('#wa-chats-dirty').textContent = m.dirty;
+  $('#wa-chats-save').disabled = m.save.disabled || pending;
+}
+function renderWaChats() {
+  const m = waChatsModel(waChats.list, waChats);
+  $('#wa-chats').replaceChildren(...(m.empty ? [el('li', { className: 'list-row muted' }, m.empty)] : m.rows.map(r => el('li', { className: 'list-row' },
+    el('label', {}, el('input', { type: 'checkbox', checked: r.on, value: r.jid }),
+      el('span', { className: 'list-main' }, el('strong', {}, r.name), el('br'), el('span', { className: 'muted small' }, r.meta)))))));
+  $('#wa-chats-more').hidden = !m.more; $('#wa-chats-more').textContent = m.more;
+  for (const chip of $$('[data-wa-filter]')) chip.setAttribute('aria-pressed', String(chip.dataset.waFilter === waChats.filter));
+  renderWaChatsSummary(m);
+}
+$('#wa-chats').addEventListener('change', e => {
+  const box = e.target.closest('input[type="checkbox"]');
+  if (!box) return;
+  waChats.draft ??= new Set(waChats.list.filter(c => c.on).map(c => c.jid));
+  box.checked ? waChats.draft.add(box.value) : waChats.draft.delete(box.value);
+  renderWaChatsSummary();
+});
+$('#wa-chat-search').addEventListener('input', e => { waChats.q = e.target.value; renderWaChats(); });
+for (const chip of $$('[data-wa-filter]')) chip.addEventListener('click', () => { waChats.filter = chip.dataset.waFilter; renderWaChats(); });
+$('#wa-chats-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!waChats.draft) return;
+  if (await post('/api/whatsapp/chats', { chats: [...waChats.draft] })) { waChats.draft = null; await loadWaChats(true); }
+});
+
+// ── WhatsApp: Link dialog. The QR code (laptop only) is an image from the portal and changes every few seconds.
+let waTimer = 0;
+async function openWaDialog() {
+  const dialog = $('#wa-dialog'), img = $('#wa-qr-img'), state = $('#wa-state');
+  img.hidden = true; state.textContent = 'Making a QR code…';
+  dialog.showModal();
+  if (!await post('/api/whatsapp/connect')) { dialog.close(); return; }
+  const tick = async () => {
+    if (!dialog.open) return;
+    await refresh();
+    const w = status?.whatsapp;
+    if (w?.phase === 'connected' || w?.phase === 'connecting') {
+      dialog.close();
+      notice('WhatsApp is linked. Turn on the chats to include. Messages from the phone arrive in the next minutes.');
+      location.hash = '#/connectors/whatsapp';
+      return;
+    }
+    if (w?.phase === 'off') { img.hidden = true; state.textContent = w.lastError || 'Linking stopped. Close this window and try again.'; return; }
+    if (w?.hasQr) { img.src = `/api/whatsapp/qr?t=${Date.now()}`; img.hidden = false; state.textContent = 'The code changes every few seconds. Scan the newest one.'; }
+    waTimer = setTimeout(tick, 3000);
+  };
+  tick();
+}
+$('#wa-cancel').addEventListener('click', () => $('#wa-dialog').close());
+$('#wa-dialog').addEventListener('close', () => {
+  clearTimeout(waTimer);
+  if (status?.whatsapp?.phase === 'linking') post('/api/whatsapp/cancel');
+});
 
 // ── Gmail: What to include. Counts and the estimate are read on demand (laptop only; the server keeps them an hour).
 // Unsaved choices live in gmailScope.draft and survive the 5-second re-render.
@@ -865,6 +937,10 @@ const ACTIONS = {
   },
   chatgptChatsDisable: () => post('/api/chatgpt-chats/disable'),
   gmailAdd: () => openGmailDialog(),
+  whatsappLink: () => openWaDialog(),
+  whatsappDisconnect: () => {
+    if (confirm('Disconnect WhatsApp? This computer is removed from Linked devices on your phone, and the messages stored on this computer are deleted. Notes already written stay.')) post('/api/whatsapp/disconnect');
+  },
   gmailDisconnect: () => { if (confirm('Disconnect Gmail? The saved app password is deleted from this computer. Notes already written stay.')) post('/api/gmail/disconnect'); },
   chatgptSignOut: () => post('/api/ai/chatgpt-signout'),
   keyRemoveOpenai: () => post('/api/ai/key', { provider: 'openai', key: null }),

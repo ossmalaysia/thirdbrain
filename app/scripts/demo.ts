@@ -74,6 +74,11 @@ export async function startDemo(opts: { port?: number } = {}): Promise<{ url: st
         summary: "The side project's domain renews next month. Auto-renew is on; the card on file expires before then." },
       { dir: "inbox/email/gmail", title: "Open-source contributor asks about the roadmap", ago: 9, tags: ["open-source"],
         summary: "A contributor offered to build the Slack connector and asked which interfaces are stable." },
+      // WhatsApp (one note per chat per month)
+      { dir: "inbox/whatsapp/chats", title: "Northwind portal project: go-live moved to the 28th", ago: 0, client: "Northwind", project: "Northwind Portal Revamp", tags: ["go-live"],
+        summary: "The group agreed to move go-live to the 28th so Northwind's testers can finish the payment cases. Daniel confirms the cut-over window." },
+      { dir: "inbox/whatsapp/chats", title: "Daniel Tan: quote for the support block", ago: 3, client: "Northwind", tags: ["sales"],
+        summary: "Daniel asked for a quote for 40 more support hours. The quote goes out after the current block is used up." },
       // Teams chats and channels
       { dir: "inbox/teams/chats", title: "Chat with Daniel Tan: SSO test accounts", ago: 0, client: "Northwind", project: "Northwind Portal Revamp", tags: ["sso"],
         summary: "Daniel will create three test accounts in Northwind's directory so the team can test single sign-on before Friday." },
@@ -130,7 +135,7 @@ export async function startDemo(opts: { port?: number } = {}): Promise<{ url: st
     const SUBJECTS = ["status update", "change request", "invoice question", "meeting notes follow-up", "test results", "deployment plan", "access request",
       "budget review", "support ticket", "design feedback", "contract question", "training session"];
     const FILLER: Record<string, number> = { "inbox/email/threads": 214, "inbox/email/gmail": 63, "inbox/teams/chats": 96, "inbox/teams/channels": 41,
-      "inbox/meetings": 58, "inbox/ai/claude": 87, "inbox/ai/chatgpt": 52 };
+      "inbox/meetings": 58, "inbox/ai/claude": 87, "inbox/ai/chatgpt": 52, "inbox/whatsapp/chats": 34 };
     for (const [dir, count] of Object.entries(FILLER)) for (let i = 0; i < count; i++) {
       const client = CLIENTS[i % CLIENTS.length], subject = SUBJECTS[(i * 5 + dir.length) % SUBJECTS.length], ago = 15 + Math.floor(i * 170 / count);
       const title = `${client}: ${subject}`, d = day(ago), sub = dir.startsWith("inbox/email/") ? `/${d.slice(0, 7)}` : "";
@@ -191,7 +196,7 @@ export async function startDemo(opts: { port?: number } = {}): Promise<{ url: st
       provider: "codex", decisionProvider: "typesafe" } as unknown as ReturnType<Deps["config"]>;
     const state = { cursors: {}, threads: many(1284, "thread"), queue: [], processed: many(5210, "msg"), lookbackDays: 90,
       scannedFolders: Object.fromEntries(Array.from({ length: 14 }, (_, i) => [`folder-${i}`, day(0)])), folderNames: Object.fromEntries(Array.from({ length: 14 }, (_, i) => [`folder-${i}`, `Folder ${i}`])),
-      lastSuccessAt: iso(6 * MIN), feedPulledAt: { outlook: iso(6 * MIN), "teams-chats": iso(6 * MIN), "teams-channels": iso(6 * MIN), meetings: iso(21 * MIN), chatgpt: iso(52 * MIN), gmail: iso(6 * MIN), "claude:personal": iso(36 * MIN), "claude:work": iso(36 * MIN) },
+      lastSuccessAt: iso(6 * MIN), feedPulledAt: { outlook: iso(6 * MIN), "teams-chats": iso(6 * MIN), "teams-channels": iso(6 * MIN), meetings: iso(21 * MIN), chatgpt: iso(52 * MIN), gmail: iso(6 * MIN), whatsapp: iso(6 * MIN), "claude:personal": iso(36 * MIN), "claude:work": iso(36 * MIN) },
       lastRun: { at: iso(8 * MIN), finishedAt: iso(6 * MIN), pulled: 37, kept: 9, written: 6, skipped: 24, blocked: 0, duplicates: 2, triageSkipped: 11, dropped: { "noise:bulk": 14, "noise:calendar": 4 }, error: null, feedErrors: {} },
     } as unknown as ReturnType<Deps["state"]>;
     const sample = (n: number) => NOTES.slice(n, n + 3).map(x => `${NOTE_PATHS[x.title]}.md`);
@@ -269,6 +274,16 @@ export async function startDemo(opts: { port?: number } = {}): Promise<{ url: st
         counts: async () => ({ at: iso(3 * MIN), options: { primary: 2140, sent: 860, important: 310, updates: 4120, promotions: 3650, social: 420, forums: 95 },
           labels: [{ name: "Clients", count: 318 }, { name: "Invoices", count: 96 }, { name: "Travel", count: 41 }] }),
         estimate: async () => ({ newThreads: 47, messages: 3310, threads: 1206 }),
+      },
+      whatsapp: {
+        status: () => ({ added: true, phase: "connected", name: "Alex", history: { progress: 100, added: 4182 }, chatsOn: 3, linkingFor: null, hasQr: false, lastError: null }),
+        connect: () => {}, cancelLink: () => {}, disconnect: async () => ({ unlinked: true }), qrSvg: async () => null, setChats: () => [],
+        chats: () => [
+          ["120363000000000101@g.us", "Northwind portal project", 0.1, 412, true], ["60100000101@s.whatsapp.net", "Daniel Tan", 0.4, 96, true],
+          ["120363000000000102@g.us", "Delivery team", 0.6, 1287, true], ["120363000000000103@g.us", "Family", 0.8, 2210, false],
+          ["60100000102@s.whatsapp.net", "Priya Nair", 2, 58, false], ["120363000000000104@g.us", "Badminton Sunday", 3, 377, false],
+          ["120363000000000105@g.us", "Regional developer meetup", 5, 164, false], ["60100000103@s.whatsapp.net", "Contoso support", 8, 23, false],
+        ].map(([jid, name, ago, count, on]) => ({ jid, name, kind: String(jid).endsWith("@g.us") ? "group" : "direct", lastAt: iso((ago as number) * DAY), count, on })),
       },
       updates: {
         status: () => ({ current: { version: "0.1.1", commit: null }, latest: { version: "0.1.1", name: "0.1.1", publishedAt: iso(2 * DAY) }, available: false, checkedAt: iso(40 * MIN),
