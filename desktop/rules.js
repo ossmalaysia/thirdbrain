@@ -50,9 +50,16 @@ function statusLine(status) {
 }
 
 // The id of the newest run when it failed and is not `seenId`, else null (one notice per failed run).
+// A lost Microsoft sign-in fails every run until the user reconnects: loginToNotify announces it once instead.
 function failedRunToNotify(status, seenId) {
   const run = status && status.runs && Array.isArray(status.runs.entries) ? status.runs.entries[0] : null;
-  return run && run.status === "failed" && run.id && run.id !== seenId ? run.id : null;
+  return run && run.status === "failed" && run.error !== "NEEDS_LOGIN" && run.id && run.id !== seenId ? run.id : null;
+}
+
+// The portal's microsoftLogin record ({ lostAt, code, reason }) when it is new since `seenAt`, else null.
+function loginToNotify(status, seenAt) {
+  const lost = status && status.microsoftLogin;
+  return lost && typeof lost.lostAt === "string" && lost.lostAt !== seenAt ? lost : null;
 }
 
 // The newer release the portal reports (status.updates, from GitHub), as a plain version string, or null.
@@ -77,4 +84,4 @@ function updateToNotify(status, seenVersion) {
 // The portal's Settings page (it has the Updates card).
 const settingsUrl = (portalUrl) => new URL("/#settings", portalUrl).href;
 
-module.exports = { isPortalUrl, externalAllowed, readPortalToken, syncRequest, statusLine, failedRunToNotify, availableUpdate, updateMenuLabel, updateToNotify, settingsUrl };
+module.exports = { isPortalUrl, externalAllowed, readPortalToken, syncRequest, statusLine, failedRunToNotify, loginToNotify, availableUpdate, updateMenuLabel, updateToNotify, settingsUrl };

@@ -4,7 +4,7 @@
 const { app, BrowserWindow, Menu, Notification, Tray, nativeImage, screen, shell } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
-const { isPortalUrl, externalAllowed, readPortalToken, syncRequest, statusLine, failedRunToNotify, updateMenuLabel, updateToNotify, settingsUrl } = require("./rules.js");
+const { isPortalUrl, externalAllowed, readPortalToken, syncRequest, statusLine, failedRunToNotify, loginToNotify, updateMenuLabel, updateToNotify, settingsUrl } = require("./rules.js");
 
 const PORTAL_URL = new URL(process.env.THIRDBRAIN_URL || "http://127.0.0.1:58432").href;
 const SMOKE = process.argv.includes("--smoke");   // load, print title + tray status, quit
@@ -111,8 +111,23 @@ async function refreshStatus() {
   statusText = statusLine(status);
   if (tray) { tray.setToolTip(`Third Brain - ${statusText}`); if (process.platform !== "win32") tray.setContextMenu(buildMenu()); }
   notifyFailedRun();
+  notifyLogin();
   notifyUpdate();
   return statusText;
+}
+
+// One notice per lost Microsoft sign-in (remembered in userData; announced also when it was lost before this app started).
+const LOGIN_SEEN_FILE = path.join(app.getPath("userData"), "login-seen.json");
+function notifyLogin() {
+  let seen = null;
+  try { seen = JSON.parse(fs.readFileSync(LOGIN_SEEN_FILE, "utf8")).lostAt || null; } catch {}
+  const lost = loginToNotify(status, seen);
+  if (!lost || SMOKE) return;
+  try { fs.mkdirSync(path.dirname(LOGIN_SEEN_FILE), { recursive: true }); fs.writeFileSync(LOGIN_SEEN_FILE, JSON.stringify({ lostAt: lost.lostAt })); } catch {}
+  if (!Notification.isSupported()) return;
+  const note = new Notification({ title: "Microsoft sign-in needed", body: `${lost.reason} Click to open Third Brain and reconnect Outlook.`, icon: ICON });
+  note.on("click", () => { showWindow(); if (win) win.loadURL(new URL("/#/connectors/outlook", PORTAL_URL).href).catch(() => {}); });
+  note.show();
 }
 
 // One notice per failed run. Runs that had already failed when the app started are not announced.

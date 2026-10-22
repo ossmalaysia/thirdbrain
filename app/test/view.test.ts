@@ -12,6 +12,9 @@ const flags = { paused: false, unavailable: false, error: undefined };
 test("headline state follows priority: busy, login, scheduler, paused, error, queue", () => {
   expect(syncState({ ...base, busy: true, needsLogin: true }, flags).text).toBe("Syncing now");
   expect(syncState({ ...base, needsLogin: true }, { ...flags, paused: true }).text).toBe("Waiting for connection");
+  const lost = syncState({ ...base, needsLogin: true, microsoftLogin: { lostAt: "2026-10-22T01:15:00Z", code: "AADSTS70043", reason: "Policy." } }, flags);
+  expect(lost).toMatchObject({ text: "Microsoft sign-in needed", tone: "warn" });
+  expect(lost.detail).toStartWith("Policy. Since ");
   expect(syncState(base, { ...flags, unavailable: true, paused: true }).tone).toBe("error");
   expect(syncState(base, { ...flags, paused: true, error: "x" }).text).toBe("Automatic sync paused");
   expect(syncState(base, { ...flags, error: "x" }).text).toBe("Last run needs attention");
@@ -52,6 +55,10 @@ test("connector cards: status pill, note count and the one obvious next action",
   expect(ok.writer.href).toBe("#settings");
   const out = byId({ ...base, needsLogin: true, lastRun: { error: "NEEDS_LOGIN", feedErrors: { "teams:chats": "Missing permission Chat.Read\nmore" } } });
   expect(out.outlook).toMatchObject({ pill: { text: "Needs sign-in" }, primary: "connect", error: "" });
+  const lost = { lostAt: "2026-10-22T01:15:00Z", code: "AADSTS50173", reason: "Microsoft ended the sign-in because the password changed or the sessions were signed out." };
+  const relogin = byId({ ...base, needsLogin: true, microsoftLogin: lost, lastRun: { error: "NEEDS_LOGIN" } });
+  expect(relogin.outlook.error).toStartWith(`${lost.reason} (AADSTS50173, since `);
+  expect(relogin["teams-chats"].primary).toBe("connect");
   const perm = byId({ ...base, lastRun: { feedErrors: { "teams:chats": "Missing permission Chat.Read\nmore" } } });
   expect(perm["teams-chats"]).toMatchObject({ pill: { text: "Needs permission" }, primary: "connect", error: "Missing permission Chat.Read" });
   expect(perm.meetings.pill.text).toBe("Connected");

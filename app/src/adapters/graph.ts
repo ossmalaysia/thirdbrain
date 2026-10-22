@@ -18,8 +18,27 @@ interface Token { access_token: string; refresh_token: string; expires_at: numbe
 export class PermissionNeededError extends Error {}
 
 export class NeedsLoginError extends Error {
-  constructor(msg = "Microsoft login needed: run `mailsync login`") { super(msg); }
+  constructor(msg = "Microsoft login needed: run `mailsync login`", readonly code: string | null = null, readonly reason = "Microsoft 365 is not connected yet.") { super(msg); }
 }
+
+// Why Microsoft refused the saved sign-in, in words a user can act on. Codes: Microsoft Entra AADSTS error codes.
+const LOGIN_REASONS: [RegExp, string][] = [
+  [/^(50173|50133|50132)$/, "Microsoft ended the sign-in because the password changed or the sessions were signed out."],
+  [/^(70008|700082)$/, "The sign-in expired because it was not used for a long time."],
+  [/^70043$/, "Your organization's policy asks for a new sign-in after a set time."],
+  [/^(50076|50079|50078)$/, "Your organization now asks for multi-factor authentication."],
+  [/^53003$/, "Your organization's Conditional Access policy blocked the sign-in."],
+  [/^50057$/, "The Microsoft account is disabled."],
+];
+
+/** The AADSTS code and a plain reason for a refused token refresh. */
+export function loginLost(t: { error?: string; error_codes?: number[] }): { code: string; reason: string } {
+  const n = t.error_codes?.[0] != null ? String(t.error_codes[0]) : null;
+  const known = n ? LOGIN_REASONS.find(([re]) => re.test(n))?.[1] : undefined;
+  return { code: n ? `AADSTS${n}` : t.error ?? "unknown_error", reason: known ?? `Microsoft refused the saved sign-in (${t.error ?? "unknown error"}).` };
+}
+
+const expired = (t: any) => { const l = loginLost(t); return new NeedsLoginError(`Microsoft login expired (${l.code}): ${l.reason}`, l.code, l.reason); };
 
 const authority = (cfg: Config) => `https://login.microsoftonline.com/${cfg.tenantId}/oauth2/v2.0`;
 
@@ -70,7 +89,7 @@ async function accessToken(cfg: Config, forceRefresh = false, scopes = SCOPES): 
   if (scopes === SCOPES) {
     if (!forceRefresh && tok.expires_at > Date.now()) return tok.access_token;
     const t = await tokenRequest(cfg, { grant_type: "refresh_token", refresh_token: tok.refresh_token, scope: SCOPES });
-    if (!t.access_token) throw new NeedsLoginError(`Microsoft login expired (${t.error}): run \`mailsync login\``);
+    if (!t.access_token) throw expired(t);
     return saveToken({ ...t, refresh_token: t.refresh_token ?? tok.refresh_token }, tok.extra).access_token;
   }
   // Teams/meetings: same refresh token, its own access token. Missing consent is reported, not fatal.
@@ -79,7 +98,7 @@ async function accessToken(cfg: Config, forceRefresh = false, scopes = SCOPES): 
   const t = await tokenRequest(cfg, { grant_type: "refresh_token", refresh_token: tok.refresh_token, scope: scopes });
   if (!t.access_token) {
     if (/consent|AADSTS65001|AADSTS90094|invalid_scope|insufficient/i.test(`${t.error} ${t.error_description}`)) throw new PermissionNeededError("Teams and meetings need permission: an admin approves the new Microsoft permissions, then use Reconnect in the portal.");
-    throw new NeedsLoginError(`Microsoft login expired (${t.error}): run \`mailsync login\``);
+    throw expired(t);
   }
   const extra = { ...tok.extra, [scopes]: { access_token: t.access_token, expires_at: Date.now() + (Number(t.expires_in) - 120) * 1000 } };
   writeJsonAtomic(TOKEN_FILE(), { ...tok, refresh_token: t.refresh_token ?? tok.refresh_token, extra });
