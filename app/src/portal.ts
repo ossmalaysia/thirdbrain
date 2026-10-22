@@ -136,6 +136,7 @@ export function publicStatus(cfg: Config, state: State, connected: boolean, runn
   const known = Object.keys(state.folderNames ?? {}).length;
   return {
     connected, needsLogin: !connected || state.lastRun?.error === "NEEDS_LOGIN", configured: !!cfg.clientId,
+    microsoftLogin: state.lastRun?.error === "NEEDS_LOGIN" ? state.microsoftLogin ?? null : null,
     busy: !!running || ["Running", "Queued"].includes(schedule.state), runningSince: running?.since ?? null, schedule,
     settings: { lookbackDays: cfg.initialSinceDays, threadsPerRun: cfg.maxThreadsPerRun, appliedDays: applied,
       provider: cfg.provider ?? "codex",

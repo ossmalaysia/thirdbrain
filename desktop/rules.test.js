@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-const { isPortalUrl, externalAllowed, readPortalToken, syncRequest, statusLine, failedRunToNotify, availableUpdate, updateMenuLabel, updateToNotify, settingsUrl } = require("./rules.js");
+const { isPortalUrl, externalAllowed, readPortalToken, syncRequest, statusLine, failedRunToNotify, loginToNotify, availableUpdate, updateMenuLabel, updateToNotify, settingsUrl } = require("./rules.js");
 
 const PORTAL = "http://127.0.0.1:58432";
 
@@ -77,6 +77,15 @@ describe("failedRunToNotify", () => {
   test("same failed run only once", () => expect(failedRunToNotify(failed, "r2")).toBe(null));
   test("succeeded run", () => expect(failedRunToNotify({ runs: { entries: [{ id: "r3", status: "succeeded" }] } }, null)).toBe(null));
   test("no status", () => expect(failedRunToNotify(null, null)).toBe(null));
+  test("a lost sign-in is not a failed-run notice", () => expect(failedRunToNotify({ runs: { entries: [{ id: "r4", status: "failed", error: "NEEDS_LOGIN" }] } }, null)).toBe(null));
+});
+
+describe("loginToNotify", () => {
+  const lost = { lostAt: "2026-10-22T01:15:00Z", code: "AADSTS50173", reason: "Password changed." };
+  test("new lost sign-in", () => expect(loginToNotify({ microsoftLogin: lost }, null)).toEqual(lost));
+  test("same lost sign-in only once", () => expect(loginToNotify({ microsoftLogin: lost }, lost.lostAt)).toBe(null));
+  test("signed in", () => expect(loginToNotify({ microsoftLogin: null }, null)).toBe(null));
+  test("no status", () => expect(loginToNotify(null, null)).toBe(null));
 });
 
 describe("updates", () => {

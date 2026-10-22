@@ -124,6 +124,8 @@ export interface State {
   indexPending?: boolean;
   /** Connector id (feed-schedule.ts scheduleKey) -> when its last pull finished (also set after a rate limit). */
   feedPulledAt?: Record<string, string>;
+  /** Set when Microsoft first refuses the saved sign-in; cleared by the next successful run. */
+  microsoftLogin?: { lostAt: string; code: string | null; reason: string };
   lastRun: { at: string; finishedAt?: string; pulled: number; kept: number; dropped: Record<string, number>; written: number; skipped: number; blocked: number; queued: number; costUsd: number; error: string | null; duplicates?: number; notes?: string[]; feedErrors?: Record<string, string> } | null;
 }
 

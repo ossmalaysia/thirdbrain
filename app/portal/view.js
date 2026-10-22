@@ -12,6 +12,8 @@ export function syncState(s, { paused, unavailable, error }) {
   if (s.busy) return s.schedule.state === 'Queued'
     ? { text: 'Sync queued', detail: 'Waiting for the local worker', tone: 'active' }
     : { text: 'Syncing now', detail: `Started ${when(s.runningSince || s.schedule.lastRun)}. The queue updates as threads finish.`, tone: 'active' };
+  if (s.needsLogin && s.microsoftLogin) return { text: 'Microsoft sign-in needed',
+    detail: `${s.microsoftLogin.reason} Since ${when(s.microsoftLogin.lostAt)}. Reconnect Outlook to resume.`, tone: 'warn' };
   if (s.needsLogin) return { text: 'Waiting for connection', detail: 'Connect Outlook to start collecting email.', tone: 'warn' };
   if (unavailable) return { text: 'Scheduler unavailable', detail: 'Start Docker Desktop and keep this portal running.', tone: 'error' };
   const every = everyPhrase(intervalFor(s, 'outlook'));
@@ -237,7 +239,8 @@ export function connectorsModel(s, counts = {}) {
         pill: !ai ? pill('Checking', 'neutral') : g?.signingIn && provider === 'codex' ? pill('Signing in', 'active') : ready ? pill('Connected', 'ok') : pill('Needs sign-in', 'warn') };
     }
     const permission = /permission/i.test(error);
-    return { error, account: def.m365 ? s.microsoft?.account || 'Microsoft 365 account' : def.account, primary: s.needsLogin || permission ? 'connect' : null,
+    const lost = def.m365 && s.needsLogin && s.microsoftLogin;
+    return { error: lost ? `${lost.reason} (${lost.code}, since ${when(lost.lostAt)})` : error, account: def.m365 ? s.microsoft?.account || 'Microsoft 365 account' : def.account, primary: s.needsLogin || permission ? 'connect' : null,
       pill: s.needsLogin ? pill('Needs sign-in', 'warn') : permission ? pill('Needs permission', 'warn') : error ? pill('Error', 'error')
         : s.busy ? pill('Syncing', 'active') : paused ? pill('Paused', 'neutral') : pill('Connected', 'ok') };
   }

@@ -149,7 +149,7 @@ async function main(): Promise<number> {
         }, { dryRun, limit, outRoot });
         if (!dryRun) {
           const finishedAt = new Date().toISOString();
-          saveState({ ...nextState, lastRun: { ...report, finishedAt },
+          saveState({ ...nextState, microsoftLogin: undefined, lastRun: { ...report, finishedAt },
             lastSuccessAt: report.error ? nextState.lastSuccessAt : finishedAt,
             folderOffset: folders.length ? plan.nextOffset : start });
         }
@@ -162,7 +162,10 @@ async function main(): Promise<number> {
         const error = e instanceof NeedsLoginError ? "NEEDS_LOGIN" : String(e);
         // Preserve the durable checkpoint if a later stage threw.
         const durable = loadState();
-        if (!dryRun) saveState({ ...durable, lastRun: { ...(durable.lastRun ?? { at: "", pulled: 0, kept: 0, dropped: {}, written: 0, skipped: 0, blocked: 0, queued: durable.queue.length, costUsd: 0 }), at: new Date().toISOString(), error } });
+        // A refused refresh (not a first-time "not connected"): keep when it started and Microsoft's reason.
+        const microsoftLogin = e instanceof NeedsLoginError && e.code !== null
+          ? { lostAt: durable.microsoftLogin?.lostAt ?? new Date().toISOString(), code: e.code, reason: e.reason } : durable.microsoftLogin;
+        if (!dryRun) saveState({ ...durable, microsoftLogin, lastRun: { ...(durable.lastRun ?? { at: "", pulled: 0, kept: 0, dropped: {}, written: 0, skipped: 0, blocked: 0, queued: durable.queue.length, costUsd: 0 }), at: new Date().toISOString(), error } });
         log({ stage: "run", error });
         console.error(e instanceof Error ? e.message : e);
         return 1;
