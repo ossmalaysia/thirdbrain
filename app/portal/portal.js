@@ -844,13 +844,19 @@ function renderUpdates(u) {
   if (text.textContent !== u.notes) text.textContent = u.notes;
 }
 let seenVersion = ''; // after a self-update the restarted portal reports a new version: load the new front end once
+// One missed poll is normal (laptop sleep, a busy sync run, a tunnel blip): go Offline only after a few in a row,
+// and clear our own Offline notice as soon as a poll works again.
+const OFFLINE_AFTER = 3, OFFLINE_NOTICE = 'The portal did not answer. It tries again every 5 seconds. If this stays, check that BrainPortal is running.';
+let failedPolls = 0, offlineText = '';
 
 async function refresh() {
   if (polling) return;
   polling = true;
   try {
-    const response = await fetch('/api/status', { cache: 'no-store' }), data = await response.json();
-    if (!response.ok) throw new Error(data.error);
+    const response = await fetch('/api/status', { cache: 'no-store' }), data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `The portal answered ${response.status}.`);
+    if (offlineText && $('#notice').textContent === offlineText) notice(''); // leave a newer notice alone
+    failedPolls = 0; offlineText = '';
     const named = productName(status) !== productName(data);
     status = data; render();
     const version = data.updates?.current?.version ?? '';
@@ -858,9 +864,11 @@ async function refresh() {
     if (version) seenVersion = version;
     if (named) document.title = document.title.replace(/ · [^·]*$/, ` · ${productName(data)}`); // the tab title carries the product name
   } catch (e) {
+    if (++failedPolls < OFFLINE_AFTER) return;
     show($('[data-bind="live"]'), { text: 'Offline', tone: 'error' });
     for (const node of $$('[data-action]')) node.disabled = true;
-    notice(e.message || 'Cannot reach the local portal. Check that BrainPortal is running.', true);
+    // fetch() rejects with a TypeError ("Failed to fetch") when no answer came; the portal's own errors are readable
+    notice(offlineText = e instanceof TypeError ? OFFLINE_NOTICE : e.message || OFFLINE_NOTICE, true);
   } finally { polling = false; }
 }
 

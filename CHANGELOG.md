@@ -5,6 +5,10 @@ All notable changes to Third Brain. Versions follow [semantic versioning](https:
 
 ## Unreleased
 
+## 0.1.2 - 2026-10-24
+
+- **Portal:** one missed status check no longer shows "Failed to fetch"; the portal shows Offline only after three
+  missed checks in a row, with a readable message, and removes that message as soon as the portal answers again.
 - **WhatsApp connector (unofficial):** a read-only linked device (QR code, like WhatsApp Web; Baileys) stores text
   messages of all chats encrypted in the state folder; only the chats turned on under **Chats to include** become notes,
   one per chat per month in `inbox/whatsapp/chats/`. Disconnect unlinks the device and deletes the store.

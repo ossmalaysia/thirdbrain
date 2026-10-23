@@ -1,7 +1,7 @@
 {
   "name": "thirdbrain-desktop",
   "productName": "Third Brain",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Desktop window and tray icon for the Third Brain portal. The background service does the work.",
   "license": "Apache-2.0",
