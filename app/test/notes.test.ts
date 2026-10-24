@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createPortal, type PortalDeps } from "../src/portal.ts";
@@ -14,6 +14,14 @@ test("note helpers derive a readable title, an Obsidian link and the body", () =
   expect(obsidianUrl("brain", NOTE)).toBe("obsidian://open?vault=brain&file=inbox%2Femail%2Fthreads%2F2026-10%2F2026-10-08-fabrikam-q1-review-preparation");
   expect(parseNote(NOTE, '---\ntitle: "Fabrikam: Q1 review"\nsource: outlook-sync\n---\n\n# Summary\nAgreed.\n')).toEqual({ title: "Fabrikam: Q1 review", body: "# Summary\nAgreed." });
   expect(parseNote(NOTE, "No frontmatter").title).toBe("Fabrikam q1 review preparation");
+});
+
+test("every Open in Obsidian link is laptop-only: an obsidian:// link does nothing on a phone or over the tunnel", () => {
+  for (const file of ["../portal/index.html", "../portal/portal.js"]) {
+    const lines = readFileSync(join(import.meta.dir, file), "utf8").split("\n").filter(l => l.includes("Open in Obsidian"));
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) expect(line).toContain("laptop-only");
+  }
 });
 
 test("note endpoint serves only notes in the connector folders", async () => {

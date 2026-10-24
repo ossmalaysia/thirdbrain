@@ -382,7 +382,7 @@ function noteList(run) {
   const items = run.notes.map(path => {
     const preview = el('button', { type: 'button', className: 'link-btn' }, noteTitle(path)); preview.dataset.note = path;
     return el('li', { className: 'list-row' }, el('span', { className: 'list-main' }, el('span', { className: 'source-tag' }, noteSource(path).tag), preview),
-      el('a', { href: obsidianUrl(status.vault, path), className: 'muted small' }, 'Open in Obsidian'));
+      el('a', { href: obsidianUrl(status.vault, path), className: 'muted small laptop-only' }, 'Open in Obsidian'));
   });
   const details = el('details', { className: 'disclosure', open: openRuns.has(run.id) }, el('summary', {}, `${run.notes.length} ${run.notes.length === 1 ? 'note' : 'notes'} written`), el('ul', { className: 'list' }, ...items));
   details.addEventListener('toggle', () => details.open ? openRuns.add(run.id) : openRuns.delete(run.id));
