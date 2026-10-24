@@ -5,6 +5,11 @@ All notable changes to Third Brain. Versions follow [semantic versioning](https:
 
 ## Unreleased
 
+## 0.1.4 - 2026-10-24
+
+- **Portal:** **Open in Obsidian** shows only on the laptop. On a phone or over the remote address the link did
+  nothing, so the note and entity dialogs now hide it there.
+
 ## 0.1.3 - 2026-10-24
 
 - **WhatsApp: all chats or chosen chats.** **All chats** turns every chat into notes, also chats that start later,
