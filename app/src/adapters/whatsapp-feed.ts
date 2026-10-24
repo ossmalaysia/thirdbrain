@@ -24,7 +24,9 @@ export function waItems(chat: WaChat, rows: WaMessage[], owner: Person, nameOf: 
   });
 }
 
-export function pullWhatsApp(store: WhatsAppStore, cursor: string | undefined, chosen: string[], owner: Person, budget = MAX_MESSAGES_PER_RUN): { items: Item[]; next: string } {
+/** `chosen` = the chat ids that become notes; `since` = the history window start (messages sent before it are passed
+ *  over; widening the window clears the cursor, see backfill.ts setWindow, so they are read then). */
+export function pullWhatsApp(store: WhatsAppStore, cursor: string | undefined, chosen: string[], owner: Person, budget = MAX_MESSAGES_PER_RUN, since = ""): { items: Item[]; next: string } {
   let marks: Record<string, number> = {};
   try { marks = cursor ? JSON.parse(cursor) : {}; } catch { marks = {}; }
   const chats = new Map(store.chats().map(c => [c.jid, c]));
@@ -32,7 +34,7 @@ export function pullWhatsApp(store: WhatsAppStore, cursor: string | undefined, c
   for (const jid of chosen) {
     const chat = chats.get(jid);
     if (!chat || budget <= 0) continue;
-    const rows = store.messagesAfter(jid, marks[jid] ?? 0, budget);
+    const rows = store.messagesAfter(jid, marks[jid] ?? 0, budget, since);
     if (!rows.length) continue;
     items.push(...waItems(chat, rows, owner, store.contactName));
     marks[jid] = rows[rows.length - 1].seq;

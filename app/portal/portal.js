@@ -167,9 +167,10 @@ function renderConnectorDetail(c) {
 
 // ── WhatsApp: Chats to include. Loaded on open, then every 20 s while nothing is changed (history keeps arriving).
 // Unsaved choices live in waChats.draft; ticking a box updates only the counts, so focus and scroll stay.
-const waChats = { list: [], q: '', filter: 'all', draft: null, loadedAt: 0, seq: 0 };
+const waChats = { list: [], q: '', filter: 'all', draft: null, draftMode: null, loadedAt: 0, seq: 0 };
+const waState = () => ({ ...waChats, mode: status?.whatsapp?.mode ?? 'chosen' });
 async function loadWaChats(force) {
-  if (remoteView() || (!force && (waChats.draft || Date.now() - waChats.loadedAt < 20_000))) return;
+  if (remoteView() || (!force && (waChats.draft || waChats.draftMode || Date.now() - waChats.loadedAt < 20_000))) return;
   waChats.loadedAt = Date.now();
   const seq = ++waChats.seq;
   try {
@@ -177,13 +178,15 @@ async function loadWaChats(force) {
     if (seq === waChats.seq && r.ok) { waChats.list = data.chats ?? []; renderWaChats(); }
   } catch { /* the next poll tries again */ }
 }
-function renderWaChatsSummary(m = waChatsModel(waChats.list, waChats)) {
+function renderWaChatsSummary(m = waChatsModel(waChats.list, waState())) {
   $('#wa-chats-count').textContent = m.count;
   $('#wa-chats-dirty').textContent = m.dirty;
   $('#wa-chats-save').disabled = m.save.disabled || pending;
+  $('#wa-mode-hint').textContent = m.hint;
+  for (const r of $$('#wa-mode input')) r.checked = r.value === m.mode;
 }
 function renderWaChats() {
-  const m = waChatsModel(waChats.list, waChats);
+  const m = waChatsModel(waChats.list, waState());
   $('#wa-chats').replaceChildren(...(m.empty ? [el('li', { className: 'list-row muted' }, m.empty)] : m.rows.map(r => el('li', { className: 'list-row' },
     el('label', {}, el('input', { type: 'checkbox', checked: r.on, value: r.jid }),
       el('span', { className: 'list-main' }, el('strong', {}, r.name), el('br'), el('span', { className: 'muted small' }, r.meta)))))));
@@ -200,10 +203,26 @@ $('#wa-chats').addEventListener('change', e => {
 });
 $('#wa-chat-search').addEventListener('input', e => { waChats.q = e.target.value; renderWaChats(); });
 for (const chip of $$('[data-wa-filter]')) chip.addEventListener('click', () => { waChats.filter = chip.dataset.waFilter; renderWaChats(); });
+// Switching to All chats ticks every chat (the owner then unticks what stays out); back to Chosen keeps the ticks.
+$('#wa-mode').addEventListener('change', e => {
+  const mode = e.target.value, saved = waState().mode;
+  waChats.draftMode = mode === saved ? null : mode;
+  if (mode === 'all') waChats.draft = new Set(waChats.list.map(c => c.jid));
+  else waChats.draft ??= new Set(waChats.list.filter(c => c.on).map(c => c.jid));
+  renderWaChats();
+});
+function tickShown(on) {
+  waChats.draft ??= new Set(waChats.list.filter(c => c.on).map(c => c.jid));
+  for (const jid of waChatsModel(waChats.list, waState()).shown) on ? waChats.draft.add(jid) : waChats.draft.delete(jid);
+  renderWaChats();
+}
+$('#wa-tick-shown').addEventListener('click', () => tickShown(true));
+$('#wa-untick-shown').addEventListener('click', () => tickShown(false));
 $('#wa-chats-form').addEventListener('submit', async e => {
   e.preventDefault();
-  if (!waChats.draft) return;
-  if (await post('/api/whatsapp/chats', { chats: [...waChats.draft] })) { waChats.draft = null; await loadWaChats(true); }
+  if (!waChats.draft && !waChats.draftMode) return;
+  const chats = waChats.draft ?? new Set(waChats.list.filter(c => c.on).map(c => c.jid));
+  if (await post('/api/whatsapp/chats', { mode: waChats.draftMode ?? waState().mode, chats: [...chats] })) { waChats.draft = null; waChats.draftMode = null; await loadWaChats(true); }
 });
 
 // ── WhatsApp: Link dialog. The QR code (laptop only) is an image from the portal and changes every few seconds.
@@ -680,7 +699,7 @@ function drawWindow(first) {
   drawWindowChange();
 }
 function drawWindowChange() {
-  const note = windowCtx?.mode === 'change' ? windowChangeNote(Number($('#window-form').elements.days.value), windowCtx.current) : '';
+  const note = windowCtx?.mode === 'change' ? windowChangeNote(Number($('#window-form').elements.days.value), windowCtx.current, windowCtx.feed === 'whatsapp' ? 'messages' : 'chats') : '';
   $('#window-change').hidden = !note; $('#window-change').textContent = note;
 }
 function closeWindow(days) {

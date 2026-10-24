@@ -6,7 +6,9 @@ import { join } from "node:path";
 import { deleteWhatsAppStore, openWhatsAppStore, type WaMessage } from "../src/adapters/whatsapp-store.ts";
 import { messageText, parseLinkLine, skipChat, storeAuthState, toWaMessage } from "../src/adapters/whatsapp-link.ts";
 import { MAX_MESSAGES_PER_RUN, pullWhatsApp, waItems } from "../src/adapters/whatsapp-feed.ts";
-import { createWhatsAppService, readChosen, saveChosen } from "../src/whatsapp.ts";
+import { activeChats, createWhatsAppService, readWaSettings, saveWaSettings, waFeedOn } from "../src/whatsapp.ts";
+import { sampleWhatsApp } from "../src/backfill-live.ts";
+import { envWindowDays, isWindowFeed } from "../src/backfill.ts";
 import { buildPrompt } from "../src/core/extract.ts";
 import { notePath } from "../src/core/render.ts";
 import { connectorsModel, catalogModel, waChatsModel } from "../portal/view.js";
@@ -125,14 +127,66 @@ describe("feed", () => {
     expect(MAX_MESSAGES_PER_RUN).toBeGreaterThan(100);
     store.close();
   });
+
+  test("history window: older messages are passed over, also when the phone sends them late", () => {
+    const store = openWhatsAppStore(tmp()), since = "2026-10-01T00:00:00Z";
+    store.addMessages([msg(ALEX, "a1", "2026-09-20T09:00:00.000Z", "old"), msg(ALEX, "a2", "2026-10-02T09:00:00.000Z", "new")]);
+    const first = pullWhatsApp(store, undefined, [ALEX], owner, undefined, since);
+    expect(first.items.map(i => i.text)).toEqual(["new"]);
+    store.addMessages([msg(ALEX, "a0", "2026-09-01T09:00:00.000Z", "history sync"), msg(ALEX, "a3", "2026-10-03T09:00:00.000Z", "newer")]);
+    expect(pullWhatsApp(store, first.next, [ALEX], owner, undefined, since).items.map(i => i.text)).toEqual(["newer"]);
+    // a wider window clears the cursor (backfill.ts setWindow): everything is read again, the pipeline skips what it had
+    expect(pullWhatsApp(store, undefined, [ALEX], owner).items.map(i => i.text)).toEqual(["old", "new", "history sync", "newer"]);
+    expect(store.chatMonths("2026-09-01T00:00:00Z")).toEqual([{ jid: ALEX, lastAt: "2026-10-03T09:00:00.000Z" }, { jid: ALEX, lastAt: "2026-09-20T09:00:00.000Z" }]);
+    expect(sampleWhatsApp(store, { mode: "all", chats: [], excluded: [ALEX] }, "2026-09-01T00:00:00Z")).toEqual({ updated: [], complete: true });
+    expect(sampleWhatsApp(store, { mode: "chosen", chats: [ALEX], excluded: [] }, "2026-10-01T00:00:00Z").updated).toHaveLength(1);
+    store.close();
+  });
+});
+
+describe("settings", () => {
+  const file = () => join(mkdtempSync(join(tmpdir(), "wa-set-")), "s.json");
+  test("chosen chats: only known chats are saved; nothing chosen keeps the feed off", () => {
+    const f = file();
+    expect(readWaSettings(f)).toEqual({ mode: "chosen", chats: [], excluded: [] });
+    expect(waFeedOn(readWaSettings(f))).toBe(false);
+    expect(saveWaSettings({ chats: [ALEX, "someone@else.com", GROUP] }, [ALEX, SAM], f)).toMatchObject({ mode: "chosen", chats: [ALEX] });
+    expect(activeChats(readWaSettings(f), [ALEX, SAM, GROUP])).toEqual([ALEX]);
+    expect(() => saveWaSettings({ chats: "all" }, [ALEX], f)).toThrow();
+    expect(() => saveWaSettings({ mode: "some", chats: [] }, [ALEX], f)).toThrow();
+  });
+
+  test("all chats: unticked chats stay out, chats that appear later come in", () => {
+    const f = file();
+    saveWaSettings({ mode: "all", chats: [ALEX, GROUP] }, [ALEX, SAM, GROUP], f);
+    const s = readWaSettings(f);
+    expect(s).toEqual({ mode: "all", chats: [ALEX, GROUP], excluded: [SAM] });
+    expect(waFeedOn(s)).toBe(true);
+    const NEW = "60100000009@s.whatsapp.net";
+    expect(activeChats(s, [NEW, ALEX, SAM, GROUP])).toEqual([NEW, ALEX, GROUP]);
+    // back to chosen: the same ticks, new chats off again
+    saveWaSettings({ mode: "chosen", chats: s.chats }, [NEW, ALEX, SAM, GROUP], f);
+    expect(activeChats(readWaSettings(f), [NEW, ALEX, SAM, GROUP])).toEqual([ALEX, GROUP]);
+  });
+
+  test("WhatsApp takes a history window: 1 month until one is chosen", () => {
+    expect(isWindowFeed("whatsapp")).toBe(true);
+    expect(envWindowDays("whatsapp", {} as any)).toBe(30);
+  });
 });
 
 describe("service", () => {
-  test("chosen chats: only known chats are saved", () => {
-    const file = join(mkdtempSync(join(tmpdir(), "wa-set-")), "s.json");
-    expect(saveChosen([ALEX, "someone@else.com", GROUP], [ALEX, SAM], file)).toEqual([ALEX]);
-    expect(readChosen(file)).toEqual([ALEX]);
-    expect(() => saveChosen("all", [ALEX], file)).toThrow();
+  test("status counts the chats that become notes in both modes", () => {
+    const dir = mkdtempSync(join(tmpdir(), "wa-mode-")), dbFile = join(dir, "w.db"), settingsFile = join(dir, "s.json");
+    const store = openWhatsAppStore(dbFile);
+    store.addMessages([msg(ALEX, "a1", "2026-10-01T09:00:00.000Z", "one"), msg(SAM, "s1", "2026-10-01T10:00:00.000Z", "two")]);
+    store.close();
+    const fake = { run() {}, stop() {}, status: () => ({ state: "stopped", lastError: null, logTail: [] }) } as unknown as Supervisor;
+    const svc = createWhatsAppService({ makeSupervisor: () => fake, dbFile, settingsFile });
+    expect(svc.status()).toMatchObject({ mode: "chosen", chatsOn: 0 });
+    expect(svc.setChats({ mode: "all", chats: [ALEX] })).toEqual({ mode: "all", on: 1, left: 1 });
+    expect(svc.status()).toMatchObject({ mode: "all", chatsOn: 1 });
+    expect(svc.chats().map(c => [c.jid, c.on])).toEqual([[SAM, false], [ALEX, true]]);
   });
 
   test("a linked device whose worker gave up is started again; an unlinked one is not", () => {
@@ -183,6 +237,10 @@ describe("portal view", () => {
     expect(byId({ ...base, whatsapp: { added: false, phase: "off", chatsOn: 0 } }).whatsapp).toBeUndefined();
     expect(byId({ ...base, whatsapp: { added: true, phase: "connected", name: "Pat", chatsOn: 0 } }).whatsapp.pill).toEqual({ text: "Choose chats", tone: "warn" });
     expect(byId({ ...base, whatsapp: { added: true, phase: "connected", name: "Pat", chatsOn: 3 } }).whatsapp.pill.text).toBe("Connected");
+    const all = byId({ ...base, whatsapp: { added: true, phase: "connected", name: "Pat", mode: "all", chatsOn: 0 }, backfill: { whatsapp: { days: 30, chosen: false } } }).whatsapp;
+    expect(all.pill.text).toBe("Connected");
+    expect(all.facts).toContainEqual(["Chats to include", "All chats (0 on)"]);
+    expect(all.window).toMatchObject({ feed: "whatsapp", days: 30, label: "1 month" });
     expect(byId({ ...base, whatsapp: { added: true, phase: "loggedOut", chatsOn: 3 } }).whatsapp).toMatchObject({ primary: "whatsappLink", pill: { text: "Signed out on the phone" } });
     const add = catalogModel({ ...base, whatsapp: { added: false, phase: "off" } }).find((c: any) => c.id === "whatsapp");
     expect(add).toMatchObject({ action: "whatsappLink", laptopOnly: true });
@@ -197,5 +255,14 @@ describe("portal view", () => {
     const m = waChatsModel(chats, { draft: new Set([ALEX]) });
     expect(m).toMatchObject({ dirty: "2 unsaved changes", save: { disabled: false }, count: "1 of 2 turned on" });
     expect(waChatsModel([], {}).empty).toContain("No chats yet");
+  });
+
+  test("chat list: all-chats mode, a mode switch counts as a change, and what Tick all shown acts on", () => {
+    const chats = [{ jid: GROUP, name: "Project Falcon", kind: "group", lastAt: "2026-10-02T09:00:00Z", count: 40, on: true },
+      { jid: ALEX, name: "Alex Tan", kind: "direct", lastAt: "2026-10-01T09:00:00Z", count: 1, on: false }];
+    expect(waChatsModel(chats, { mode: "all" })).toMatchObject({ mode: "all", count: "All chats: 1 of 2 on", save: { disabled: true } });
+    expect(waChatsModel(chats, { mode: "all" }).hint).toContain("Untick");
+    expect(waChatsModel(chats, { mode: "chosen", draftMode: "all" })).toMatchObject({ mode: "all", dirty: "1 unsaved change", save: { disabled: false } });
+    expect(waChatsModel(chats, { filter: "group" }).shown).toEqual([GROUP]);
   });
 });

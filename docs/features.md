@@ -129,7 +129,9 @@ Every connector has a page with what it reads, its facts and its own controls.
   threads the note writer would summarise. **Save** applies the choice from the next run; mail already in your brain is
   skipped.
 - **WhatsApp: Chats to include.** Every chat with stored messages, newest first, with search and filters (groups,
-  one-to-one, turned on). Only the chats you turn on become notes; keep family and private chats off.
+  one-to-one, turned on). Two modes: **Chosen chats** (only the ticked chats) or **All chats** (every chat, also new
+  ones, except the unticked chats); keep family and private chats off. A history window (1 month by default) sets how
+  far back the notes go.
 - **Claude.ai** lists each account with its own window and schedule; **Add another account** signs in a second
   login (for example personal and work).
 
