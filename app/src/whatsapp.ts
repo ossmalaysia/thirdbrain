@@ -1,6 +1,7 @@
 // The WhatsApp connection in the portal: runs the linked-device worker (adapters/whatsapp-link.ts) as a supervised
-// child process, shows its QR code while linking, and keeps which chats become notes (whatsapp-settings.json; none
-// until the owner turns one on). Disconnect removes the linked device and deletes the local store.
+// child process, shows its QR code while linking, and keeps which chats become notes (whatsapp-settings.json: the
+// chosen chats only, the default with none chosen, or all chats but the ones left out). Disconnect removes the linked
+// device and deletes the local store.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import QRCode from "qrcode";
@@ -18,16 +19,33 @@ const JID = /^[0-9a-z.:_-]{1,80}@(s\.whatsapp\.net|g\.us|lid)$/i;
 
 export type WhatsAppPhase = "off" | "linking" | "connecting" | "connected" | "offline" | "loggedOut";
 
-/** The chats whose messages become notes. */
-export function readChosen(file = SETTINGS_FILE): string[] {
-  const raw = readJson(file, {}) as { chats?: unknown };
-  return Array.isArray(raw?.chats) ? raw.chats.filter((j): j is string => typeof j === "string" && JID.test(j)) : [];
+/** "chosen": only `chats` become notes. "all": every chat except `excluded`, so new chats come in by themselves. */
+export type WaMode = "chosen" | "all";
+export interface WaSettings { mode: WaMode; chats: string[]; excluded: string[] }
+
+const jids = (v: unknown) => Array.isArray(v) ? v.filter((j): j is string => typeof j === "string" && JID.test(j)) : [];
+export function readWaSettings(file = SETTINGS_FILE): WaSettings {
+  const raw = readJson(file, {}) as { mode?: unknown; chats?: unknown; excluded?: unknown };
+  return { mode: raw?.mode === "all" ? "all" : "chosen", chats: jids(raw?.chats), excluded: jids(raw?.excluded) };
 }
-export function saveChosen(jids: unknown, known: string[], file = SETTINGS_FILE): string[] {
-  if (!Array.isArray(jids) || jids.length > 2000) throw new Error("Choose the chats from the list.");
-  const allowed = new Set(known), chats = [...new Set(jids.filter((j): j is string => typeof j === "string" && allowed.has(j)))];
-  atomicJson(file, { chats, savedAt: new Date().toISOString() });
-  return chats;
+/** Whether any chat can become a note (the sync run skips the feed otherwise, without opening the store). */
+export const waFeedOn = (s: WaSettings) => s.mode === "all" || s.chats.length > 0;
+/** The chats whose messages become notes, out of the chats in the store. */
+export function activeChats(s: WaSettings, known: string[]): string[] {
+  if (s.mode === "chosen") return s.chats;
+  const out = new Set(s.excluded);
+  return known.filter(j => !out.has(j));
+}
+/** The portal's Save: the mode and the chats ticked in the list. In "all" mode the unticked chats are the ones left
+ *  out; the ticked list is kept too, so going back to "chosen" keeps the same choice. */
+export function saveWaSettings(body: { mode?: unknown; chats?: unknown }, known: string[], file = SETTINGS_FILE): WaSettings {
+  if (!Array.isArray(body.chats) || body.chats.length > 5000) throw new Error("Choose the chats from the list.");
+  if (body.mode !== undefined && body.mode !== "all" && body.mode !== "chosen") throw new Error("Choose all chats or chosen chats.");
+  const allowed = new Set(known), chats = [...new Set(body.chats.filter((j): j is string => typeof j === "string" && allowed.has(j)))];
+  const on = new Set(chats), mode: WaMode = body.mode === "all" ? "all" : "chosen";
+  const settings = { mode, chats, excluded: known.filter(j => !on.has(j)) };
+  atomicJson(file, { ...settings, savedAt: new Date().toISOString() });
+  return settings;
 }
 
 interface Deps {
@@ -93,7 +111,7 @@ export function createWhatsAppService(deps: Deps = {}) {
       stopLinkTimer(); worker.stop();
       const unlinked = linked() && deps.unlink ? await deps.unlink().catch(() => false) : false;
       deleteWhatsAppStore(dbFile);
-      atomicJson(settingsFile, { chats: [], savedAt: new Date().toISOString() });
+      atomicJson(settingsFile, { mode: "chosen", chats: [], excluded: [], savedAt: new Date().toISOString() });
       phase = "off"; qr = null; name = null; history = null; lastError = null;
       return { unlinked };
     },
@@ -101,14 +119,22 @@ export function createWhatsAppService(deps: Deps = {}) {
     async qrSvg(): Promise<string | null> { return qr ? QRCode.toString(qr, { type: "svg", margin: 1, errorCorrectionLevel: "M" }) : null; },
     chats(): (WaChat & { on: boolean })[] {
       if (!existsSync(dbFile)) return [];
-      const store = openWhatsAppStore(dbFile), chosen = new Set(readChosen(settingsFile));
-      try { return store.chats().map(c => ({ ...c, on: chosen.has(c.jid) })); } finally { store.close(); }
+      const store = openWhatsAppStore(dbFile);
+      try {
+        const list = store.chats(), on = new Set(activeChats(readWaSettings(settingsFile), list.map(c => c.jid)));
+        return list.map(c => ({ ...c, on: on.has(c.jid) }));
+      } finally { store.close(); }
     },
-    setChats(jids: unknown) { return saveChosen(jids, this.chats().map(c => c.jid), settingsFile); },
+    setChats(body: { mode?: unknown; chats?: unknown }) {
+      const s = saveWaSettings(body, this.chats().map(c => c.jid), settingsFile);
+      return { mode: s.mode, on: s.chats.length, left: s.excluded.length };
+    },
     status() {
-      const proc = worker.status();
+      const proc = worker.status(), settings = readWaSettings(settingsFile);
       const added = phase !== "off" || linked();
-      return { added, phase: phase === "connecting" && proc.state === "error" ? "offline" as const : phase, name, history, chatsOn: readChosen(settingsFile).length,
+      // "all" mode counts against the chats in the store; "chosen" needs only the settings file (no store on each poll).
+      const chatsOn = settings.mode === "all" ? this.chats().filter(c => c.on).length : settings.chats.length;
+      return { added, phase: phase === "connecting" && proc.state === "error" ? "offline" as const : phase, name, history, mode: settings.mode, chatsOn,
         linkingFor: phase === "linking" ? Math.round((now() - linkingSince) / 1000) : null, hasQr: !!qr, lastError: lastError ?? proc.lastError };
     },
     stop() { stopLinkTimer(); if (watchdog) clearInterval(watchdog); watchdog = null; worker.stop(); },

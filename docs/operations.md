@@ -139,9 +139,13 @@ How it works:
 - Text messages of all chats are stored in `whatsapp/whatsapp.db` in the state folder, outside the vault. The message
   text and the sign-in keys are encrypted with the state folder's key; chat and contact names are not, so the chat list
   can show them. Photos, videos, voice messages and documents are stored as a marker such as `[photo]`.
-- On the WhatsApp page, **Chats to include** chooses the chats that become notes. None is on at first. Only those
-  chats reach the note writer: one note per chat per month in `inbox/whatsapp/chats/`, with the usual secret check,
+- On the WhatsApp page, **Chats to include** chooses the chats that become notes: **Chosen chats** (only the ticked
+  chats; none at first; new chats stay off) or **All chats** (every chat, also chats that start later, except the
+  unticked ones). **Tick all shown** / **Untick all shown** act on the current search and filter. Only those chats
+  reach the note writer: one note per chat per month in `inbox/whatsapp/chats/`, with the usual secret check,
   decision model, entities and related notes. Phone numbers are never written into notes.
+- **History window** (WhatsApp card, Change): 1 month until you choose 6 months, 1 year or 2 years. Messages sent
+  before the window are passed over; widening it reads them on the next run (messages already summarised are skipped).
 - WhatsApp sends a part of the history when you link (usually the recent months). Older history is not available
   through a linked device.
 - Your phone must connect to the internet at least every 14 days, or WhatsApp signs out all linked devices.

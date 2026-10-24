@@ -18,6 +18,7 @@ import { CHATGPT_FEED } from "./adapters/chatgpt-web.ts";
 import { GMAIL_FEED, GmailError } from "./adapters/gmail-imap.ts";
 import { createGmailService, type GmailService } from "./gmail.ts";
 import { createWhatsAppService, type WhatsAppService } from "./whatsapp.ts";
+import { WHATSAPP_FEED } from "./adapters/whatsapp-feed.ts";
 import { RANGES, savePrices, usageReport, rangeStart, type Range } from "./usage.ts";
 import { createDream, type Dream } from "./dream.ts";
 import { automaticDecisions, createEntityIndex, createMergeApplier, ENTITY_KINDS, recordDistinct, recordMerge, undoMerge, type EntityIndex } from "./entities-view.ts";
@@ -271,8 +272,8 @@ export function createPortal(port = portalPort(), services: PortalDeps = deps) {
   const shellFile = (path: string) => new Response(Bun.file(join(assets, path.slice(1))), { headers: { ...headers, "content-type": SHELL[path],
     ...(path === "/sw.js" ? { "cache-control": "no-cache" } : {}) } });
   const sessions = services.sessions ?? createSessions();
-  // Feeds that take a history window: every Claude.ai account's feed, ChatGPT and Gmail.
-  const windowFeeds = () => [...(services.claude?.list() ?? []).map(a => a.feed), CHATGPT_FEED, ...(services.gmail ? [GMAIL_FEED] : [])];
+  // Feeds that take a history window: every Claude.ai account's feed, ChatGPT, Gmail and WhatsApp.
+  const windowFeeds = () => [...(services.claude?.list() ?? []).map(a => a.feed), CHATGPT_FEED, ...(services.gmail ? [GMAIL_FEED] : []), ...(services.whatsapp ? [WHATSAPP_FEED] : [])];
   const windowSummary = () => {
     if (!services.backfill) return null;
     const cfg = services.config(), w = services.backfill.windows();
@@ -280,7 +281,7 @@ export function createPortal(port = portalPort(), services: PortalDeps = deps) {
   };
   const windowMessage = (days: number, r: { widened: boolean; cursorReset: boolean }, feed = "") => {
     const label = ({ 30: "1 month", 182: "6 months", 365: "1 year", 730: "2 years" } as Record<number, string>)[days] ?? `${days} days`;
-    const [things, Things] = feed === GMAIL_FEED ? ["emails", "Emails"] : ["chats", "Chats"];
+    const [things, Things] = feed === GMAIL_FEED ? ["emails", "Emails"] : feed === WHATSAPP_FEED ? ["messages", "Messages"] : ["chats", "Chats"];
     return r.cursorReset ? `History window set to ${label}. Older ${things} are read again from the next run; ${things} already in your brain are skipped.`
       : r.widened ? `History window set to ${label}.` : `History window set to ${label}. ${Things} older than that are no longer read; existing notes stay.`;
   };
@@ -442,11 +443,15 @@ export function createPortal(port = portalPort(), services: PortalDeps = deps) {
       }
       if (url.pathname.startsWith("/api/whatsapp/") && services.whatsapp) { // laptop only (not in PUBLIC_POSTS)
         if (Number(req.headers.get("content-length") ?? 0) > 200_000) return json({ error: "Request too large" }, 413);
-        const w = services.whatsapp, body = await req.json().catch(() => ({})) as { chats?: unknown };
+        const w = services.whatsapp, body = await req.json().catch(() => ({})) as { mode?: unknown; chats?: unknown };
         if (url.pathname === "/api/whatsapp/connect") { w.connect(); return json({ message: "Scan the QR code with WhatsApp on your phone." }); }
         if (url.pathname === "/api/whatsapp/cancel") { w.cancelLink(); return json({ message: "Linking stopped." }); }
         if (url.pathname === "/api/whatsapp/chats") {
-          try { const on = w.setChats(body.chats); return json({ message: on.length ? `Saved. ${on.length} ${on.length === 1 ? "chat becomes" : "chats become"} notes from the next run.` : "Saved. No chat becomes notes." }); }
+          try {
+            const r = w.setChats(body), chats = (n: number) => `${n} ${n === 1 ? "chat" : "chats"}`;
+            return json({ message: r.mode === "all" ? `Saved. All chats become notes from the next run${r.left ? `, except ${chats(r.left)} left out` : ""}. New chats are included too.`
+              : r.on ? `Saved. ${chats(r.on)} ${r.on === 1 ? "becomes" : "become"} notes from the next run.` : "Saved. No chat becomes notes." });
+          }
           catch (e) { return json({ error: e instanceof Error ? e.message : "Could not save." }, 400); }
         }
         if (url.pathname === "/api/whatsapp/disconnect") {

@@ -68,11 +68,17 @@ export function openWhatsAppStore(file = WA_DB, opts: { readonly?: boolean } = {
         .map(r => ({ jid: r.jid, name: r.name, kind: chatKind(r.jid), lastAt: r.last_at, count: r.count }));
     },
     contactName: (jid: string) => db.query<{ name: string }, [string]>("SELECT name FROM contacts WHERE jid = ?").get(jid)?.name ?? null,
-    /** Messages of one chat stored after `afterSeq`, oldest first. */
-    messagesAfter(jid: string, afterSeq: number, limit = 2000): (WaMessage & { seq: number })[] {
-      return db.query<{ seq: number; jid: string; id: string; at: string; from_me: number; sender: string | null; sender_name: string | null; text: string }, [string, number, number]>(
-        "SELECT * FROM messages WHERE jid = ? AND seq > ? ORDER BY seq LIMIT ?").all(jid, afterSeq, limit)
+    /** Messages of one chat stored after `afterSeq` and sent at or after `since` (the history window), in stored order. */
+    messagesAfter(jid: string, afterSeq: number, limit = 2000, since = ""): (WaMessage & { seq: number })[] {
+      return db.query<{ seq: number; jid: string; id: string; at: string; from_me: number; sender: string | null; sender_name: string | null; text: string }, [string, number, string, number]>(
+        "SELECT * FROM messages WHERE jid = ? AND seq > ? AND at >= ? ORDER BY seq LIMIT ?").all(jid, afterSeq, since, limit)
         .map(r => ({ seq: r.seq, jid: r.jid, id: r.id, at: r.at, fromMe: !!r.from_me, sender: r.sender, senderName: r.sender_name, text: box.open(r.text) ?? "" }));
+    },
+    /** Notes-to-be for the backfill estimate: one row per chat and month since `since`, with its newest message time. */
+    chatMonths(since: string): { jid: string; lastAt: string }[] {
+      return db.query<{ jid: string; last_at: string }, [string]>(
+        "SELECT jid, max(at) AS last_at FROM messages WHERE at >= ? GROUP BY jid, substr(at, 1, 7) ORDER BY last_at DESC").all(since)
+        .map(r => ({ jid: r.jid, lastAt: r.last_at }));
     },
     /** Prepared statements first: on Windows an open statement keeps the file locked, and Disconnect deletes it. */
     close: () => { for (const s of [insert, touch, chatName, contact]) s.finalize(); db.close(); },

@@ -9,6 +9,10 @@ import { browserApi, type ClaudeApi } from "./claude-web/session.ts";
 import { loadState } from "./state.ts";
 import { GMAIL_FEED, openGmail } from "./adapters/gmail-imap.ts";
 import { loadGmail, sampleGmail } from "./gmail.ts";
+import { existsSync } from "node:fs";
+import { WHATSAPP_FEED } from "./adapters/whatsapp-feed.ts";
+import { openWhatsAppStore, WA_DB, type WhatsAppStore } from "./adapters/whatsapp-store.ts";
+import { activeChats, readWaSettings, type WaSettings } from "./whatsapp.ts";
 
 /** ChatGPT: one or two list pages. The list's `total` is fake, so density decides when the pages run out first. */
 export const sampleChatGpt = (api: ChatGptApi, stopBefore: string, maxPages = 2) =>
@@ -45,8 +49,19 @@ export function pendingChatGpt(cursor: string | undefined): { updated: string[];
   } catch { return null; }
 }
 
+/** WhatsApp: one row per chat and month (one note each) in the chats that become notes, from the local store. */
+export function sampleWhatsApp(store: WhatsAppStore, settings: WaSettings, stopBefore: string): { updated: string[]; complete: boolean } {
+  const on = new Set(activeChats(settings, store.chats().map(c => c.jid)));
+  return { updated: store.chatMonths(stopBefore).filter(m => on.has(m.jid)).map(m => m.lastAt), complete: true };
+}
+
 /** null when the feed's account is not signed in (the dialog then shows per-chat figures only). */
 export async function liveSample(feed: string, stopBefore: string) {
+  if (feed === WHATSAPP_FEED) {
+    if (!existsSync(WA_DB)) return null;
+    const store = openWhatsAppStore();
+    try { return sampleWhatsApp(store, readWaSettings(), stopBefore); } finally { store.close(); }
+  }
   if (feed === GMAIL_FEED) { const account = loadGmail(); return account ? sampleGmail(() => openGmail(account), stopBefore) : null; }
   if (feed === CHATGPT_FEED) {
     const auth = createChatGptAuth();

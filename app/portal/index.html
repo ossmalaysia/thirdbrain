@@ -120,7 +120,11 @@
       <div class="card-head"><h2 id="wa-chats-title">Chats to include</h2><span class="muted small" id="wa-chats-count"></span></div>
       <p class="hint remote-only">Choose the chats on the laptop.</p>
       <form id="wa-chats-form" class="laptop-only">
-        <p class="hint">Only the chats you turn on become notes. Keep family and private chats off. The list shows every chat with stored messages, newest first.</p>
+        <fieldset class="choices wa-mode" id="wa-mode"><legend class="sr-only">Which chats become notes</legend>
+          <label class="choice"><input type="radio" name="mode" value="chosen"><span><strong>Chosen chats</strong><small>Only the chats you tick.</small></span></label>
+          <label class="choice"><input type="radio" name="mode" value="all"><span><strong>All chats</strong><small>Every chat, also new ones, except the chats you untick.</small></span></label>
+        </fieldset>
+        <p class="hint" id="wa-mode-hint"></p>
         <div class="toolbar">
           <div class="toolbar-grow"><label class="sr-only" for="wa-chat-search">Search chats</label><input id="wa-chat-search" type="search" placeholder="Search chats" autocomplete="off"></div>
           <div class="chips" role="group" aria-label="Show">
@@ -130,6 +134,7 @@
             <button type="button" class="chip" data-wa-filter="on" aria-pressed="false">Turned on</button>
           </div>
         </div>
+        <div class="actions muted small"><button type="button" class="btn btn-quiet" id="wa-tick-shown">Tick all shown</button><button type="button" class="btn btn-quiet" id="wa-untick-shown">Untick all shown</button></div>
         <ul class="list wa-chats" id="wa-chats"></ul>
         <p class="hint" id="wa-chats-more" hidden></p>
         <div class="actions end"><span class="muted small" id="wa-chats-dirty"></span><button class="btn" type="submit" id="wa-chats-save" disabled>Save</button></div>

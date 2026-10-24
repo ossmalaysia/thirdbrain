@@ -20,7 +20,7 @@ import { enrichGmailThread, GMAIL_FEED, openGmail, pullGmail } from "./adapters/
 import { loadGmail, ownerEmails, readScope } from "./gmail.ts";
 import { pullWhatsApp, WHATSAPP_FEED } from "./adapters/whatsapp-feed.ts";
 import { openWhatsAppStore, WA_DB } from "./adapters/whatsapp-store.ts";
-import { readChosen } from "./whatsapp.ts";
+import { activeChats, readWaSettings, waFeedOn } from "./whatsapp.ts";
 import { commitAndIndex } from "./core/commit.ts";
 import { shadowTriage, triageDecision, TYPESAFE_DEFAULT_MODEL } from "./core/decision.ts";
 import { buildPrompt } from "./core/extract.ts";
@@ -113,8 +113,9 @@ async function main(): Promise<number> {
         const me = { name: String(profile.displayName ?? (app.owner.name || "Me")), email: String(profile.mail ?? profile.userPrincipalName ?? "").toLowerCase() };
         // Gmail (IMAP + app password): optional, its own feed. The connected address counts as the owner (gmail.ts).
         const gmail = loadGmail(), openMail = () => openGmail(gmail!);
-        // WhatsApp: only the chats turned on in the portal, read from the linked device's local store.
-        const waChats = existsSync(WA_DB) ? readChosen() : [];
+        // WhatsApp: the chats turned on in the portal (or all but the ones left out), read from the linked device's
+        // local store, inside the feed's history window.
+        const waSettings = readWaSettings(), waOn = existsSync(WA_DB) && waFeedOn(waSettings);
         const owner = { ...app.owner, name: app.owner.name || String(profile.displayName ?? ""), emails: ownerEmails([...app.owner.emails, ...(me.email ? [me.email] : [])]) };
         const teams = teamsDeps(cfg, { id: String(profile.id ?? ""), name: String(profile.displayName ?? ""), email: String(profile.mail ?? profile.userPrincipalName ?? "").toLowerCase() });
         const extractCwd = join(STATE_DIR, "extract-cwd");
@@ -132,7 +133,7 @@ async function main(): Promise<number> {
         // Each connector has its own interval (portal: Sync every); only the feeds that are due take part.
         // A manual Sync now (`run --all`) and a resync/backfill take every feed. Email is decided on its own.
         const feeds = overloaded ? [] : dueFeeds({ email: plan.folders.map(f => f.id), teams: Object.values(FEEDS), mail: gmail ? [GMAIL_FEED] : [],
-          chats: queued < maxQueue ? [...claudeAccounts.map(a => a.feed), ...(chatgptOn ? [CHATGPT_FEED] : []), ...(waChats.length ? [WHATSAPP_FEED] : [])] : [],
+          chats: queued < maxQueue ? [...claudeAccounts.map(a => a.feed), ...(chatgptOn ? [CHATGPT_FEED] : []), ...(waOn ? [WHATSAPP_FEED] : [])] : [],
           all: flag("--all") || flag("--resync") || flag("--backfill"), pulledAt: state.feedPulledAt, saved: readSchedule() });
         const folders = plan.folders.filter(f => feeds.includes(f.id));
         const { report, notes, nextState } = await runOnce(cfg, state, {
@@ -141,7 +142,8 @@ async function main(): Promise<number> {
           folders: feeds,
           pulledKey: scheduleKey,
           waitAfter: isRateLimit, // a ChatGPT 429 waits a full interval, like a finished pull
-          pull: (folder, cursor) => folder === WHATSAPP_FEED ? withWhatsAppStore(store => pullWhatsApp(store, cursor, waChats, { name: owner.name || "Me", email: owner.emails[0] ?? "" }))
+          pull: (folder, cursor) => folder === WHATSAPP_FEED ? withWhatsAppStore(store => pullWhatsApp(store, cursor, activeChats(waSettings, store.chats().map(c => c.jid)),
+              { name: owner.name || "Me", email: owner.emails[0] ?? "" }, undefined, feedSince(WHATSAPP_FEED, cfg, windows)))
             : folder === GMAIL_FEED ? pullGmail(openMail, cursor, feedSince(GMAIL_FEED, cfg, windows), { name: owner.name || gmail!.address, email: gmail!.address }, undefined, readScope().scope)
             : folder === CHATGPT_FEED ? pullChatGptChats(chatgpt, cursor, feedSince(CHATGPT_FEED, cfg, windows), me, chatgptAccount)
             : accountOf(folder) ? pullClaudeChats(browserApi(accountOf(folder)!.port), cursor, feedSince(accountOf(folder)!.feed, cfg, windows), me, undefined, { id: accountOf(folder)!.id, label: accountOf(folder)!.label })

@@ -8,6 +8,7 @@ import { atomicJson, readJson } from "../docker/scheduler.mjs";
 import { AI_FEED } from "./adapters/claude-web.ts";
 import { CHATGPT_FEED } from "./adapters/chatgpt-web.ts";
 import { GMAIL_FEED } from "./adapters/gmail-imap.ts";
+import { WHATSAPP_FEED } from "./adapters/whatsapp-feed.ts";
 
 export const BACKFILL_FILE = join(STATE_DIR, "backfill.json");
 export const WINDOW_CHOICES = [30, 182, 365, 730] as const;
@@ -16,8 +17,8 @@ const DAY = 86400_000;
 
 export type Windows = Record<string, { days: number; chosenAt: string }>;
 
-/** Claude.ai feeds (`ai:claude`, `ai:claude:<id>`), ChatGPT and Gmail: the feeds that take a history window. */
-export const isWindowFeed = (feed: string) => feed === CHATGPT_FEED || feed === GMAIL_FEED || feed === AI_FEED || /^ai:claude:[a-z0-9-]{1,40}$/.test(feed);
+/** Claude.ai feeds (`ai:claude`, `ai:claude:<id>`), ChatGPT, Gmail and WhatsApp: the feeds that take a history window. */
+export const isWindowFeed = (feed: string) => feed === CHATGPT_FEED || feed === GMAIL_FEED || feed === WHATSAPP_FEED || feed === AI_FEED || /^ai:claude:[a-z0-9-]{1,40}$/.test(feed);
 export const isWindowDays = (days: unknown): days is number => WINDOW_CHOICES.includes(days as any);
 
 export function readWindows(file = BACKFILL_FILE): Windows {
@@ -30,8 +31,10 @@ export function readWindows(file = BACKFILL_FILE): Windows {
 /** The env window a feed uses when nothing was chosen (the behaviour before history windows existed). */
 /** Gmail has no settings-file window: 1 year until one is chosen. */
 export const GMAIL_DEFAULT_DAYS = 365;
+/** WhatsApp: 1 month until one is chosen, so turning on all chats does not summarise years of history at once. */
+export const WHATSAPP_DEFAULT_DAYS = 30;
 export const envWindowDays = (feed: string, cfg: Pick<Config, "aiSinceDays" | "chatgptSinceDays">) =>
-  feed === GMAIL_FEED ? GMAIL_DEFAULT_DAYS : feed === CHATGPT_FEED ? cfg.chatgptSinceDays ?? cfg.aiSinceDays ?? 30 : cfg.aiSinceDays ?? 30;
+  feed === GMAIL_FEED ? GMAIL_DEFAULT_DAYS : feed === WHATSAPP_FEED ? WHATSAPP_DEFAULT_DAYS :feed === CHATGPT_FEED ? cfg.chatgptSinceDays ?? cfg.aiSinceDays ?? 30 : cfg.aiSinceDays ?? 30;
 
 /** Days back for a feed: the chosen window, else the env window. */
 export const feedWindowDays = (feed: string, cfg: Pick<Config, "aiSinceDays" | "chatgptSinceDays">, windows: Windows) =>

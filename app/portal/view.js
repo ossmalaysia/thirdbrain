@@ -241,9 +241,9 @@ export function connectorsModel(s, counts = {}) {
     if (def.id === 'whatsapp') {
       const w = s.whatsapp, phase = w?.phase ?? 'off', relink = phase === 'loggedOut' || phase === 'off';
       return { error: phase === 'loggedOut' ? 'WhatsApp on the phone removed this linked device. Link it again to continue.' : error || (phase === 'offline' ? w?.lastError ?? '' : ''),
-        account: w?.name ?? 'WhatsApp', added: !!w?.added, primary: relink ? 'whatsappLink' : null,
+        account: w?.name ?? 'WhatsApp', added: !!w?.added, primary: relink ? 'whatsappLink' : null, window: windowOf(s, def.feed),
         actions: relink ? ['whatsappDisconnect', 'whatsappLink'] : ['whatsappDisconnect'],
-        pill: !w ? pill('Checking', 'neutral') : phase === 'connected' && !w.chatsOn ? pill('Choose chats', 'warn') : pill(...(WHATSAPP_PHASES[phase] ?? WHATSAPP_PHASES.off)) };
+        pill: !w ? pill('Checking', 'neutral') : phase === 'connected' && !w.chatsOn && w.mode !== 'all' ? pill('Choose chats', 'warn') : pill(...(WHATSAPP_PHASES[phase] ?? WHATSAPP_PHASES.off)) };
     }
     if (def.id === 'writer') {
       const g = ai?.chatgpt, ready = provider === 'codex' ? g?.signedIn || g?.cliSignedIn : !!ai?.keys?.[provider];
@@ -268,7 +268,7 @@ export function connectorsModel(s, counts = {}) {
     const every = spans.length === 1 ? everyPhrase(spans[0]) : "on each account's own schedule";
     const facts = def.id === 'writer' ? [] : [['Notes in vault', count == null ? '—' : number(count)], ['Last synced', when(s.lastSuccessAt)], ['Next run', nextRun(schedule ?? soonest)]];
     if (def.id === 'gmail') facts.push(['Mail read', gmailScopeModel(s.gmail).summary.replace(/\.$/, '')], ['App password', s.gmail?.passwordSaved ? 'Saved, encrypted on this computer' : 'Not saved']);
-    if (def.id === 'whatsapp') facts.push(['Chats to include', `${number(s.whatsapp?.chatsOn ?? 0)} chosen`],
+    if (def.id === 'whatsapp') facts.push(['Chats to include', s.whatsapp?.mode === 'all' ? `All chats (${number(s.whatsapp.chatsOn ?? 0)} on)` : `${number(s.whatsapp?.chatsOn ?? 0)} chosen`],
       ['History from the phone', !s.whatsapp?.history ? 'Arrives in the first minutes after linking' : `${number(s.whatsapp.history.added)} messages${s.whatsapp.history.progress != null && s.whatsapp.history.progress < 100 ? ` (${s.whatsapp.history.progress}%)` : ''}`]);
     if (def.id === 'outlook') facts.push(['History scanned', `${s.counts.scannedFolders}${s.counts.totalFolders ? ` of ${s.counts.totalFolders}` : ''} folders, ${s.settings.lookbackDays} days back`]);
     // Who/what this connector runs as, shown under the name on every card.
@@ -717,7 +717,8 @@ export function windowDialogModel({ est, status, feed, mode, current, claude }) 
   const loaded = !!est && est !== 'unavailable', perChat = loaded ? est.perChat : FALLBACK_PER_CHAT;
   const writer = loaded ? est.writer : status?.settings ? { provider: status.settings.provider || 'codex', extractor: status.settings.extractor, model: status.settings.model } : null;
   const threadsPerRun = loaded ? est.threadsPerRun : status?.settings?.threadsPerRun ?? 25;
-  const gmail = feed === 'gmail', [one, many] = gmail ? ['thread', 'threads'] : ['chat', 'chats'];
+  // WhatsApp: one note per chat and month, so that is what is counted.
+  const gmail = feed === 'gmail', wa = feed === 'whatsapp', [one, many] = gmail ? ['thread', 'threads'] : wa ? ['chat month', 'chat months'] : ['chat', 'chats'];
   const choices = WINDOW_CHOICES.map(([days, label]) => {
     const c = loaded ? est.choices.find(x => x.days === days) : null;
     let line;
@@ -726,11 +727,12 @@ export function windowDialogModel({ est, status, feed, mode, current, claude }) 
     else line = `≈ ${tokens(perChat.in)} tokens in and ${tokens(perChat.out)} out per ${one}`;
     return { days, label, line };
   });
-  const name = gmail ? 'Gmail' : claude ? 'Claude.ai' : 'ChatGPT';
+  const name = gmail ? 'Gmail' : wa ? 'WhatsApp' : claude ? 'Claude.ai' : 'ChatGPT';
   const notes = [];
   if (gmail && (mode === 'add' || (loaded && !est.counted))) notes.push('Thread counts appear once Gmail is connected; until then each choice shows the cost per thread.');
   else if (claude && (mode === 'add' || (loaded && !est.counted))) notes.push('Chat counts appear once this account is signed in; until then each choice shows the cost per chat.');
   else if (est === 'unavailable') notes.push(`${gmail ? 'Thread' : 'Chat'} counts appear after the portal restarts; until then each choice shows the cost per ${one}.`);
+  if (wa) notes.push('Counts cover the chats that become notes now, and only the history the phone sent at linking.');
   if (loaded && est.perChat.source === 'default') notes.push(`Per-${one} figures are a typical measurement; they become your own after a few runs.`);
   if (loaded && est.counted && est.choices.some(c => c.approximate)) notes.push(`Counts marked ≈ are estimated from your most recent ${many}.`);
   notes.push(`Time assumes ${number(threadsPerRun)} conversations per run, one run every 15 minutes, shared with your other connectors.`);
@@ -740,14 +742,14 @@ export function windowDialogModel({ est, status, feed, mode, current, claude }) 
       : `Choose how much history to import. Each ${one} in the window is read once and summarised into a note; new ${many} then sync every 15 minutes.`,
     choices, writer: writerLine(writer), notes,
     confirm: mode === 'change' ? 'Change window' : claude ? 'Confirm and sign in' : 'Confirm and add',
-    selected: WINDOW_CHOICES.some(([d]) => d === current) ? current : gmail ? 365 : 182,
+    selected: WINDOW_CHOICES.some(([d]) => d === current) ? current : gmail ? 365 : wa ? 30 : 182,
     feed,
   };
 }
 /** What changing the window does, for the selected choice. */
-export const windowChangeNote = (selected, current) => current == null || selected === current ? ''
-  : selected > current ? 'Widening re-reads older chats from the next run. Chats already in your brain are skipped, so only new history is summarised.'
-  : 'Narrowing stops reading chats older than the new window. Notes already written stay in your brain.';
+export const windowChangeNote = (selected, current, things = 'chats') => current == null || selected === current ? ''
+  : selected > current ? `Widening re-reads older ${things} from the next run. ${capital(things)} already in your brain are skipped, so only new history is summarised.`
+  : `Narrowing stops reading ${things} older than the new window. Notes already written stay in your brain.`;
 
 // ── Usage page: tokens and spend per provider, day and source (from /api/usage) ──
 export const USAGE_RANGES = [['7d', 'Last 7 days'], ['30d', 'Last 30 days'], ['90d', 'Last 90 days'], ['all', 'All time']];
@@ -824,17 +826,23 @@ export function gmailScopeModel(g, { counts = null, countsError = '', estimate =
 }
 
 /** WhatsApp Chats to include: search, filter chips and unsaved choices (`draft`: a Set of chat ids, or null = as saved). */
-export function waChatsModel(chats, { q = '', filter = 'all', draft = null, limit = 150 } = {}) {
+/** `mode` = the saved mode ('chosen' or 'all'), `draftMode` = an unsaved switch of it. */
+export function waChatsModel(chats, { q = '', filter = 'all', draft = null, mode = 'chosen', draftMode = null, limit = 150 } = {}) {
   const isOn = c => draft ? draft.has(c.jid) : c.on;
   const words = q.trim().toLowerCase();
   const match = chats.filter(c => (filter === 'all' || (filter === 'on' ? isOn(c) : c.kind === filter)) && (!words || (c.name ?? '').toLowerCase().includes(words)));
-  const changed = draft ? chats.filter(c => draft.has(c.jid) !== c.on).length : 0;
+  const shownMode = draftMode ?? mode, all = shownMode === 'all';
+  const changed = (draft ? chats.filter(c => draft.has(c.jid) !== c.on).length : 0) + (shownMode !== mode ? 1 : 0);
   const onCount = chats.filter(isOn).length;
   return {
+    mode: shownMode,
+    hint: all ? 'Every chat becomes notes, also chats that start later. Untick family and private chats to leave them out.'
+      : 'Only the chats you tick become notes. New chats stay off until you tick them. Keep family and private chats off.',
+    shown: match.map(c => c.jid), // "Tick all shown" / "Untick all shown" act on the search and filter result
     rows: match.slice(0, limit).map(c => ({ jid: c.jid, on: isOn(c), name: c.name ?? (c.kind === 'group' ? 'Unnamed group' : 'Unnamed chat'),
       meta: `${c.kind === 'group' ? 'Group' : 'One-to-one'} · ${number(c.count)} ${c.count === 1 ? 'message' : 'messages'} · last ${when(c.lastAt)}` })),
     more: match.length > limit ? `${number(match.length - limit)} more. Search to find them.` : '',
-    count: `${number(onCount)} of ${number(chats.length)} turned on`,
+    count: all ? `All chats: ${number(onCount)} of ${number(chats.length)} on` : `${number(onCount)} of ${number(chats.length)} turned on`,
     dirty: changed ? `${changed} unsaved ${changed === 1 ? 'change' : 'changes'}` : '',
     save: { disabled: !changed },
     empty: !chats.length ? 'No chats yet. Messages from the phone arrive in the first minutes after linking.' : !match.length ? 'No chat matches.' : '',

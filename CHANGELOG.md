@@ -5,6 +5,14 @@ All notable changes to Third Brain. Versions follow [semantic versioning](https:
 
 ## Unreleased
 
+## 0.1.3 - 2026-10-24
+
+- **WhatsApp: all chats or chosen chats.** **All chats** turns every chat into notes, also chats that start later,
+  except the chats you untick; **Chosen chats** keeps the old behaviour. **Tick all shown** / **Untick all shown**
+  act on the search and filter.
+- **WhatsApp: history window.** Like Gmail and the AI chats: 1 month by default, 6 months, 1 year or 2 years, with
+  counts and cost per choice; messages older than the window are passed over.
+
 ## 0.1.2 - 2026-10-24
 
 - **Portal:** one missed status check no longer shows "Failed to fetch"; the portal shows Offline only after three
