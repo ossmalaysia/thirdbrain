@@ -14,7 +14,7 @@
     "baileys": "7.0.0-rc14",
     "fflate": "^0.8.3",
     "imapflow": "2.4.3",
-    "mailparser": "3.9.36",
+    "mailparser": "3.9.38",
     "openai": "7.34.0",
     "qrcode": "1.5.4",
     "unpdf": "^1.9.0"
