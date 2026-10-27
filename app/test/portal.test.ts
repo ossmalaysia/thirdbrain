@@ -11,6 +11,15 @@ test("portal exposes counts, not message contents or identifiers; changed range 
   expect(status.counts.scannedFolders).toBe(0); expect(status.settings.appliedDays).toBe(10);
   for (const hidden of ["PRIVATE", "private-", "fingerprint", "muted"]) expect(JSON.stringify(status)).not.toContain(hidden);
 });
+test("a sign-in saved after the refused run ends 'needs login' before the next sync", () => {
+  const lost: State = { ...state, lastRun: { at: "2026-10-28T01:00:00Z", pulled: 0, kept: 0, dropped: {}, written: 0, skipped: 0, blocked: 0, queued: 0, costUsd: 0, error: "NEEDS_LOGIN" },
+    microsoftLogin: { lostAt: "2026-10-28T01:00:00Z", code: "AADSTS50078", reason: "MFA." } };
+  const before = publicStatus(cfg, lost, true, null, ready, {}, Date.parse("2026-10-28T00:59:00Z"));
+  expect(before).toMatchObject({ needsLogin: true, signInRenewed: false, microsoftLogin: { code: "AADSTS50078" } });
+  const after = publicStatus(cfg, lost, true, null, ready, {}, Date.parse("2026-10-28T01:23:00Z"));
+  expect(after).toMatchObject({ needsLogin: false, signInRenewed: true, microsoftLogin: null });
+  expect(publicStatus(cfg, lost, true, null, ready).needsLogin).toBe(true); // token time unknown
+});
 function fixture(port: number) {
   let task = { ...ready }, running = false, configured: Record<string, string> | null = null;
   const actions: string[] = [], exchanges: string[] = [];

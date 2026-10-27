@@ -5,6 +5,12 @@ All notable changes to Third Brain. Versions follow [semantic versioning](https:
 
 ## Unreleased
 
+## 0.1.5 - 2026-10-28
+
+- **Portal:** **Reconnect** for Microsoft 365 now ends "Needs sign-in" at once. Before, the cards kept asking until
+  the next scheduled run, and **Sync now** stayed off, so a successful sign-in looked like it did nothing. A token
+  saved after the refused run now shows "Microsoft reconnected" and turns **Sync now** back on.
+
 ## 0.1.4 - 2026-10-24
 
 - **Portal:** **Open in Obsidian** shows only on the laptop. On a phone or over the remote address the link did

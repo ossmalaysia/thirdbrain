@@ -14,6 +14,8 @@ export function syncState(s, { paused, unavailable, error }) {
     : { text: 'Syncing now', detail: `Started ${when(s.runningSince || s.schedule.lastRun)}. The queue updates as threads finish.`, tone: 'active' };
   if (s.needsLogin && s.microsoftLogin) return { text: 'Microsoft sign-in needed',
     detail: `${s.microsoftLogin.reason} Since ${when(s.microsoftLogin.lostAt)}. Reconnect Outlook to resume.`, tone: 'warn' };
+  if (s.signInRenewed && !s.needsLogin) return { text: 'Microsoft reconnected',
+    detail: 'The sign-in works again. Use Sync now, or wait for the next run.', tone: 'ok' };
   if (s.needsLogin) return { text: 'Waiting for connection', detail: 'Connect Outlook to start collecting email.', tone: 'warn' };
   if (unavailable) return { text: 'Scheduler unavailable', detail: 'Start Docker Desktop and keep this portal running.', tone: 'error' };
   const every = everyPhrase(intervalFor(s, 'outlook'));
