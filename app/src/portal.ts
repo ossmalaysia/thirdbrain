@@ -33,6 +33,8 @@ const backups = createBackupScheduler();
 export type { Schedule } from "./runner.ts";
 export interface PortalDeps {
   config: () => Config; state: () => State; connected: () => boolean;
+  /** When the Microsoft token was last saved (ms), or null: a sign-in after a refused run ends "needs login". */
+  signedInAt?: () => number | null;
   /** Product name, owner and Microsoft 365 account from config.json (default: Third Brain, no owner). */
   app?: () => Pick<AppConfig, "product" | "owner" | "microsoft">;
   running: () => { since: string | null } | null;
@@ -109,6 +111,7 @@ const deps: PortalDeps = {
   entities: { index: createEntityIndex(() => loadConfig().brainPath), applier: createMergeApplier(runEntitiesRebuild) },
   config: loadConfig, state: cachedState, app: loadAppConfig,
   connected: () => existsSync(join(STATE_DIR, "token.json")),
+  signedInAt: () => { try { return statSync(join(STATE_DIR, "token.json")).mtimeMs; } catch { return null; } },
   running: runningCollector,
   schedule: async () => dockerBackend() ? dockerSchedule() : { ...JSON.parse(await powershell("$t=Get-ScheduledTask -TaskName BrainRunner; $i=Get-ScheduledTaskInfo -TaskName BrainRunner; [pscustomobject]@{state=[string]$t.State; nextRun=$(if($i.NextRunTime.Year -gt 2000){$i.NextRunTime.ToUniversalTime().ToString('o')}else{$null}); lastRun=$(if($i.LastRunTime.Year -gt 2000){$i.LastRunTime.ToUniversalTime().ToString('o')}else{$null}); result=$i.LastTaskResult} | ConvertTo-Json -Compress")), backend: "windows" },
   action: async action => {
@@ -138,13 +141,17 @@ export const STATUS_RUNS = 25;
 export const limitRuns = <T extends { entries: unknown[] }>(h: T): T => ({ ...h, entries: h.entries.slice(0, STATUS_RUNS) });
 
 /** Only operational metadata reaches the browser: no mail, IDs, tokens or local credentials. */
-export function publicStatus(cfg: Config, state: State, connected: boolean, running: ReturnType<PortalDeps["running"]>, schedule: Schedule, intervals: Record<string, number> = {}) {
+export function publicStatus(cfg: Config, state: State, connected: boolean, running: ReturnType<PortalDeps["running"]>, schedule: Schedule, intervals: Record<string, number> = {}, signedInAt: number | null = null) {
+  // Only a sync run clears NEEDS_LOGIN, and Sync now is off while it is set: a token saved after the refused
+  // run (Reconnect, or a refresh that worked) means the sign-in is back, so the page must not keep asking.
+  const refused = state.lastRun?.error === "NEEDS_LOGIN";
+  const signInRenewed = refused && signedInAt !== null && signedInAt > Date.parse(state.lastRun!.at);
   const applied = state.lookbackDays ?? null;
   const coverage = applied === cfg.initialSinceDays ? Object.keys(state.scannedFolders ?? {}).length : 0;
   const known = Object.keys(state.folderNames ?? {}).length;
   return {
-    connected, needsLogin: !connected || state.lastRun?.error === "NEEDS_LOGIN", configured: !!cfg.clientId,
-    microsoftLogin: state.lastRun?.error === "NEEDS_LOGIN" ? state.microsoftLogin ?? null : null,
+    connected, needsLogin: !connected || (refused && !signInRenewed), signInRenewed, configured: !!cfg.clientId,
+    microsoftLogin: refused && !signInRenewed ? state.microsoftLogin ?? null : null,
     busy: !!running || ["Running", "Queued"].includes(schedule.state), runningSince: running?.since ?? null, schedule,
     settings: { lookbackDays: cfg.initialSinceDays, threadsPerRun: cfg.maxThreadsPerRun, appliedDays: applied,
       provider: cfg.provider ?? "codex",
@@ -321,7 +328,7 @@ export function createPortal(port = portalPort(), services: PortalDeps = deps) {
     }
     try {
       if (req.method === "GET") {
-        if (url.pathname === "/api/status") return json({ ...publicStatus(services.config(), services.state(), services.connected(), services.running(), await schedule(), intervals()),
+        if (url.pathname === "/api/status") return json({ ...publicStatus(services.config(), services.state(), services.connected(), services.running(), await schedule(), intervals(), services.signedInAt?.() ?? null),
           runs: limitRuns(services.history?.() ?? { total: 0, succeeded: 0, failed: 0, skipped: 0, entries: [] }), backup: await backup(), ai: await services.ai?.status() ?? null, remote: services.remote ? withoutLogs({ ...services.remote.status(), devices: sessions.count() }, isPublic) : null, claude: services.claude?.status() ?? null, claudeAccounts: services.claude?.list() ?? [], gmail: services.gmail?.status() ?? null, whatsapp: services.whatsapp?.status() ?? null, dream: services.dream?.status() ?? null, chatgptChats: { enabled: chatgptChatsEnabled() }, updates: publicUpdates(services.updates?.status() ?? null, isPublic), backfill: windowSummary(), vault: basename(services.config().brainPath), notice, ...identity(appInfo()) });
         if (Object.hasOwn(SHELL, url.pathname)) return shellFile(url.pathname);
         // WhatsApp: the QR code reads every chat and the chat list names private chats, so both stay on the laptop.

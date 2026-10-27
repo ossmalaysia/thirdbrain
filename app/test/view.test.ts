@@ -15,6 +15,8 @@ test("headline state follows priority: busy, login, scheduler, paused, error, qu
   const lost = syncState({ ...base, needsLogin: true, microsoftLogin: { lostAt: "2026-10-22T01:15:00Z", code: "AADSTS70043", reason: "Policy." } }, flags);
   expect(lost).toMatchObject({ text: "Microsoft sign-in needed", tone: "warn" });
   expect(lost.detail).toStartWith("Policy. Since ");
+  expect(syncState({ ...base, signInRenewed: true }, flags)).toMatchObject({ text: "Microsoft reconnected", tone: "ok" });
+  expect(viewModel({ ...base, signInRenewed: true }).controls.sync.disabled).toBe(false);
   expect(syncState(base, { ...flags, unavailable: true, paused: true }).tone).toBe("error");
   expect(syncState(base, { ...flags, paused: true, error: "x" }).text).toBe("Automatic sync paused");
   expect(syncState(base, { ...flags, error: "x" }).text).toBe("Last run needs attention");
