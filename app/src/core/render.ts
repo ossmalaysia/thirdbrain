@@ -14,6 +14,8 @@ export const SOURCE_STYLE: Record<Source, { dir: string; kind: string; source: s
   "chatgpt-chat": { dir: "inbox/ai/chatgpt", kind: "ai-conversation", source: "chatgpt-sync", tag: "ai-chat", link: "Open in ChatGPT", unit: "conversation" },
   "gmail": { dir: "inbox/email/gmail", kind: "email-thread", source: "gmail-sync", tag: "email", link: "Open in Gmail", unit: "thread" },
   "whatsapp": { dir: "inbox/whatsapp/chats", kind: "whatsapp-chat", source: "whatsapp-sync", tag: "whatsapp", link: "Open in WhatsApp", unit: "chat" },
+  // No stable link to one EzyChat chat (its address would hold the customer's phone number): the note has none.
+  "ezychat": { dir: "inbox/ezychat/chats", kind: "ezychat-chat", source: "ezychat-sync", tag: "ezychat", link: "Open in EzyChat", unit: "chat" },
 };
 export const styleOf = (thread: Thread) => SOURCE_STYLE[thread.items[0]?.source ?? "email"];
 

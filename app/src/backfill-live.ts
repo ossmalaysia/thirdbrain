@@ -13,6 +13,11 @@ import { existsSync } from "node:fs";
 import { WHATSAPP_FEED } from "./adapters/whatsapp-feed.ts";
 import { openWhatsAppStore, WA_DB, type WhatsAppStore } from "./adapters/whatsapp-store.ts";
 import { activeChats, readWaSettings, type WaSettings } from "./whatsapp.ts";
+import { EZYCHAT_FEED, ezychatApi, sampleEzyChat } from "./adapters/ezychat.ts";
+import { loadEzyChat } from "./ezychat.ts";
+
+/** EzyChat: one row per chat changed in the window (its newest message time), from the chat list only. */
+export { sampleEzyChat };
 
 /** ChatGPT: one or two list pages. The list's `total` is fake, so density decides when the pages run out first. */
 export const sampleChatGpt = (api: ChatGptApi, stopBefore: string, maxPages = 2) =>
@@ -62,6 +67,7 @@ export async function liveSample(feed: string, stopBefore: string) {
     const store = openWhatsAppStore();
     try { return sampleWhatsApp(store, readWaSettings(), stopBefore); } finally { store.close(); }
   }
+  if (feed === EZYCHAT_FEED) { const conn = loadEzyChat(); return conn ? sampleEzyChat(ezychatApi(conn), stopBefore) : null; }
   if (feed === GMAIL_FEED) { const account = loadGmail(); return account ? sampleGmail(() => openGmail(account), stopBefore) : null; }
   if (feed === CHATGPT_FEED) {
     const auth = createChatGptAuth();

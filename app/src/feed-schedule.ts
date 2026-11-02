@@ -9,11 +9,12 @@ import { AI_FEED } from "./adapters/claude-web.ts";
 import { CHATGPT_FEED } from "./adapters/chatgpt-web.ts";
 import { GMAIL_FEED } from "./adapters/gmail-imap.ts";
 import { WHATSAPP_FEED } from "./adapters/whatsapp-feed.ts";
+import { EZYCHAT_FEED } from "./adapters/ezychat.ts";
 
 export const SCHEDULE_FILE = join(STATE_DIR, "feed-schedule.json");
 export const SYNC_INTERVALS = [15, 30, 60, 120, 180, 360, 720, 1440] as const;
 /** chatgpt.com allows about one chat read a minute during a big import, so ChatGPT waits longest by default. */
-export const DEFAULT_INTERVALS: Record<string, number> = { outlook: 15, "teams-chats": 15, "teams-channels": 15, meetings: 30, chatgpt: 120, gmail: 15, whatsapp: 15 };
+export const DEFAULT_INTERVALS: Record<string, number> = { outlook: 15, "teams-chats": 15, "teams-channels": 15, meetings: 30, chatgpt: 120, gmail: 15, whatsapp: 15, ezychat: 15 };
 export const CLAUDE_DEFAULT = 60;
 /** A pull finishes some minutes after its tick. Without this grace a 15-minute feed whose pull ended at :02 would
  *  not be due at :15 (13 minutes later). Less than one tick, so a feed never runs earlier than one tick before its time. */
@@ -28,6 +29,7 @@ export function scheduleKey(feed: string): string {
   if (feed === CHATGPT_FEED) return "chatgpt";
   if (feed === GMAIL_FEED) return "gmail";
   if (feed === WHATSAPP_FEED) return "whatsapp";
+  if (feed === EZYCHAT_FEED) return "ezychat";
   if (feed === AI_FEED) return "claude:personal";
   if (feed.startsWith(`${AI_FEED}:`)) return `claude:${feed.slice(AI_FEED.length + 1)}`;
   return "outlook";
@@ -70,5 +72,6 @@ export function dueFeeds(opts: { email: string[]; teams: string[]; mail?: string
   return [...(opts.email.length && due(opts.email[0]) ? opts.email : []), ...opts.teams.filter(due), ...(opts.mail ?? []).filter(due), ...opts.chats.filter(due)];
 }
 
-/** The ChatGPT 429 message (adapters/chatgpt-web.ts): the feed waits a full interval, as after a finished pull. */
+/** The ChatGPT and EzyChat 429 messages (adapters/chatgpt-web.ts, adapters/ezychat.ts): the feed waits a full
+ *  interval, as after a finished pull. */
 export const isRateLimit = (message: string) => /rate limit \(HTTP 429\)/i.test(message);

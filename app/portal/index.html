@@ -542,6 +542,23 @@
     <div class="actions end"><button class="btn btn-quiet" type="button" id="gmail-cancel">Cancel</button><button class="btn" type="submit" id="gmail-submit">Test and connect</button></div>
   </form>
 </dialog>
+<dialog id="ezychat-dialog" class="panel dialog dialog-narrow" aria-labelledby="ezychat-title" aria-describedby="ezychat-lede">
+  <form id="ezychat-form" class="dialog-form" autocomplete="off" novalidate>
+    <header class="window-head"><h2 id="ezychat-title">Add EzyChat</h2>
+      <p class="muted small" id="ezychat-lede">The customer chats of your EzyChat team inbox become notes, one per chat per month. Read-only: nothing is sent and nothing changes in EzyChat. Do this first:</p></header>
+    <ol class="signin-steps">
+      <li>In EzyChat, open <strong>Settings -> Integrations</strong> and turn on <strong>Let AI assistants read this inbox</strong>.</li>
+      <li>Copy the connector address shown there (with or without <strong>/mcp</strong>) and paste it below.</li>
+      <li>Choose <strong>Connect</strong>. EzyChat opens its approval page: sign in as an admin and approve <strong>Third Brain</strong>. You come back here.</li>
+    </ol>
+    <div class="field"><label for="ezychat-address">EzyChat address</label><input class="key" id="ezychat-address" name="address" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://inbox.example.com/mcp" required>
+      <p class="hint">EzyChat answers only on its own computer or through its tunnel address. The token EzyChat issues is stored encrypted on this computer, outside the vault.</p></div>
+    <fieldset class="choices window-choices" id="ezychat-choices"><legend>History window</legend></fieldset>
+    <p class="callout" id="ezychat-writer"></p>
+    <p class="alert" id="ezychat-error" role="alert" hidden></p>
+    <div class="actions end"><button class="btn btn-quiet" type="button" id="ezychat-cancel">Cancel</button><button class="btn" type="submit" id="ezychat-submit">Connect</button></div>
+  </form>
+</dialog>
 <dialog id="wa-dialog" class="panel dialog dialog-narrow" aria-labelledby="wa-title" aria-describedby="wa-lede">
   <div class="dialog-form">
     <header class="window-head"><h2 id="wa-title">Link WhatsApp</h2>

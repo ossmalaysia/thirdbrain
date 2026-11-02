@@ -5,6 +5,15 @@ All notable changes to Third Brain. Versions follow [semantic versioning](https:
 
 ## Unreleased
 
+- **EzyChat connector:** the customer chats of an EzyChat team inbox (Lite or Enterprise, any number of inboxes)
+  become notes, one per chat per month in `inbox/ezychat/chats/` (`source: ezychat-sync`), through EzyChat's own MCP
+  server (read-only). **Connect** uses EzyChat's sign-in: the portal registers itself, an EzyChat admin approves
+  **Third Brain**, and the token is stored encrypted on this computer (no token to copy). The address is accepted with
+  or without `/mcp`. Own **Sync every** and history window (1 month by default); at most 40 chats and 50 EzyChat calls
+  a run, the rest in the next runs. A refused token shows **Reconnect**; a rate limit waits for the next run; a
+  problem with EzyChat never stops the other feeds. Phone numbers never reach a note: chats are named by their chat
+  name, and note ids use a hash of the chat id.
+
 ## 0.1.6 - 2026-11-02
 
 - **Claude.ai:** one very long chat no longer stops the whole account. A chat that Claude.ai cannot send within
