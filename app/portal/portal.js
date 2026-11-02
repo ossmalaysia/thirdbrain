@@ -112,7 +112,7 @@ for (const node of $$('.source-icon[data-icon]')) { const svg = iconSvg(node.dat
 const actionButton = (name, quiet = false, laptopOnly = false) => {
   const b = el('button', { type: 'button', className: `btn${quiet ? ' btn-quiet' : ''}${laptopOnly ? ' laptop-only' : ''}`, disabled: true }); b.dataset.action = name; return b;
 };
-const LAPTOP_ONLY = new Set(['claudeConnect', 'claudeDisconnect', 'gmailAdd', 'gmailDisconnect', 'whatsappLink', 'whatsappDisconnect']);
+const LAPTOP_ONLY = new Set(['claudeConnect', 'claudeDisconnect', 'gmailAdd', 'gmailDisconnect', 'whatsappLink', 'whatsappDisconnect', 'ezychatAdd', 'ezychatTest', 'ezychatDisconnect']);
 function connectorCard(c) {
   return el('li', { className: 'panel conn-card' },
     el('div', { className: 'conn-top' }, mark(el('span', { className: 'source-icon', ariaHidden: 'true' }), c), pill(c.pill)),
@@ -771,6 +771,49 @@ $('#gmail-form').addEventListener('submit', async e => {
   finally { submit.disabled = false; submit.textContent = 'Test and connect'; }
 });
 
+// ── EzyChat: the address and the history window, then EzyChat's own approval page. No token is typed: the portal
+// registers itself, the EzyChat admin approves, and EzyChat sends the browser back to /ezychat/callback on this laptop.
+let ezySeq = 0;
+function openEzyChatDialog() {
+  const dialog = $('#ezychat-dialog'), form = $('#ezychat-form'), seq = ++ezySeq;
+  const ctx = { feed: 'ezychat', mode: 'add', current: status.backfill?.ezychat?.days ?? 30, claude: false, est: null };
+  const draw = first => {
+    const m = windowDialogModel({ ...ctx, status }), box = $('#ezychat-choices');
+    $('#ezychat-writer').textContent = m.writer;
+    if (first) box.replaceChildren(box.querySelector('legend'), ...m.choices.map(c => {
+      const line = el('small', {}, c.line); line.dataset.line = String(c.days);
+      return el('label', { className: 'choice' }, el('input', { type: 'radio', name: 'days', value: String(c.days), checked: c.days === m.selected }), el('span', {}, el('strong', {}, c.label), line));
+    }));
+    else for (const c of m.choices) box.querySelector(`[data-line="${c.days}"]`).textContent = c.line;
+  };
+  form.reset(); $('#ezychat-error').hidden = true;
+  if (status.ezychat?.address) form.elements.address.value = status.ezychat.address;
+  draw(true);
+  dialog.showModal();
+  form.elements.address.focus();
+  if (status.ezychat?.connected) void fetch('/api/backfill/estimate?feed=ezychat', { cache: 'no-store' })
+    .then(async r => { const d = await r.json().catch(() => null); return r.ok && d?.choices ? d : 'unavailable'; }, () => 'unavailable')
+    .then(est => { if (seq === ezySeq && dialog.open) { ctx.est = est; draw(false); } });
+}
+$('#ezychat-cancel').addEventListener('click', () => $('#ezychat-dialog').close());
+$('#ezychat-dialog').addEventListener('close', () => { ezySeq++; });
+$('#ezychat-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.target, error = $('#ezychat-error'), submit = $('#ezychat-submit');
+  const address = f.elements.address.value.trim();
+  const fail = message => { error.textContent = message; error.hidden = false; };
+  if (!address) return fail('Enter the EzyChat address, e.g. https://inbox.example.com (EzyChat Settings -> Integrations shows it).');
+  error.hidden = true; submit.disabled = true; submit.textContent = 'Opening EzyChat…';
+  try {
+    const r = await fetch('/api/ezychat/connect', { method: 'POST', headers: { 'content-type': 'application/json', 'x-portal-token': token },
+      body: JSON.stringify({ address, days: Number(f.elements.days.value) }) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.url) return fail(data.error || 'EzyChat could not be reached. Try again.');
+    location.assign(data.url); // EzyChat's approval page; it returns to this portal
+  } catch { fail('The portal did not answer. Check that it is still running.'); }
+  finally { submit.disabled = false; submit.textContent = 'Connect'; }
+});
+
 // ── Usage page: /api/usage?range=, loaded on open and on range change (not on the 5-second poll).
 let usageRange = '30d', usageSeq = 0, pricesDirty = false;
 const PRICE_ROWS = [['codex', 'Codex (API-equivalent)'], ['openai', 'OpenAI API'], ['anthropic', 'Claude API']];
@@ -967,6 +1010,11 @@ const ACTIONS = {
   whatsappLink: () => openWaDialog(),
   whatsappDisconnect: () => {
     if (confirm('Disconnect WhatsApp? This computer is removed from Linked devices on your phone, and the messages stored on this computer are deleted. Notes already written stay.')) post('/api/whatsapp/disconnect');
+  },
+  ezychatAdd: () => openEzyChatDialog(),
+  ezychatTest: () => post('/api/ezychat/test'),
+  ezychatDisconnect: () => {
+    if (confirm('Disconnect EzyChat? The token is deleted from this computer. Also remove Third Brain under EzyChat Settings -> Integrations -> Connected apps. Notes already written stay.')) void post('/api/ezychat/disconnect');
   },
   gmailDisconnect: () => { if (confirm('Disconnect Gmail? The saved app password is deleted from this computer. Notes already written stay.')) post('/api/gmail/disconnect'); },
   chatgptSignOut: () => post('/api/ai/chatgpt-signout'),

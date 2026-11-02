@@ -102,8 +102,8 @@ The portal answers on `127.0.0.1` only. On the laptop no login is needed; other 
 
 ![Connectors page in dark mode: one card per source with its account, note count and last sync](feature-screen/connectors-dark.png)
 
-The home page. One card per source: Outlook email, Teams chats, Teams channels, meetings, Gmail, WhatsApp, each
-Claude.ai account, ChatGPT chats, and the note writer.
+The home page. One card per source: Outlook email, Teams chats, Teams channels, meetings, Gmail, WhatsApp, EzyChat,
+each Claude.ai account, ChatGPT chats, and the note writer.
 
 - Each card shows the account it reads as, its status (**Connected**, **Syncing**, **Needs sign-in**, **Error**),
   how many notes it wrote and when it last synced.
@@ -132,6 +132,9 @@ Every connector has a page with what it reads, its facts and its own controls.
   one-to-one, turned on). Two modes: **Chosen chats** (only the ticked chats) or **All chats** (every chat, also new
   ones, except the unticked chats); keep family and private chats off. A history window (1 month by default) sets how
   far back the notes go.
+- **EzyChat** shows the address, the result of the last check (chats in the inbox) and **Test**, **Disconnect**, the
+  history window (1 month by default) and **Sync every**. When EzyChat refuses the token (the app was removed in
+  EzyChat), the page shows **Reconnect**.
 - **Claude.ai** lists each account with its own window and schedule; **Add another account** signs in a second
   login (for example personal and work).
 
@@ -147,6 +150,11 @@ Every kind of source, whether it is added already, and the button to add it.
 - **Gmail**: a form walks you through creating an app password (no Google Cloud project), then tests it.
 - **WhatsApp**: shows a QR code; scan it in WhatsApp on your phone under Linked devices. Read-only and unofficial
   (see [operations](operations.md#whatsapp)).
+- **EzyChat**: the customer chats of an EzyChat team inbox (Lite or Enterprise), one note per chat per month in
+  `inbox/ezychat/chats/`, with the chat's status, assignee and labels. Turn on **Let AI assistants read this inbox** in
+  EzyChat Settings -> Integrations, paste the address shown there, choose **Connect** and approve **Third Brain** on
+  EzyChat's page as an admin. No token to copy. Read-only; customers are named by their chat name and phone numbers
+  never reach a note. Laptop only (the sign-in returns to `localhost`).
 
 Chat sources and Gmail first ask for a history window and show what it is expected to cost.
 

@@ -74,8 +74,16 @@ Never include passwords, codes, account/card/ID numbers, or any credential. Neve
 const sourceLabel = (source: string, who: string) => ({ "email": "email thread", "teams-chat": "Teams chat",
   "teams-channel": "Teams channel thread", "meeting": "meeting", "ai-chat": `conversation between ${who} and Claude (claude.ai)`,
   "chatgpt-chat": `conversation between ${who} and ChatGPT (chatgpt.com)`, "gmail": "email thread (Gmail)",
-  "whatsapp": `WhatsApp chat of ${who} (one month of messages; the subject names the chat)` } as Record<string, string>)[source];
-/** "Name <email>", or the name alone when the source has no addresses (WhatsApp). */
+  "whatsapp": `WhatsApp chat of ${who} (one month of messages; the subject names the chat)`,
+  "ezychat": `EzyChat business chat: a customer's WhatsApp chat with ${who}'s team inbox (one month of messages; the subject names the customer)` } as Record<string, string>)[source];
+/** EzyChat: the chat's status, assignee and labels as last read (the newest message carries the newest state). */
+const ezychatLine = (thread: Thread) => {
+  const c = [...thread.items].reverse().find(i => i.ezychat)?.ezychat;
+  if (!c) return "";
+  const parts = [c.status && `status ${c.status}`, c.assignedTo && `assigned to ${c.assignedTo}`, c.tags.length && `labels: ${c.tags.join(", ")}`, c.inbox && `inbox ${c.inbox}`].filter(Boolean);
+  return parts.length ? `\nEzyChat chat: ${parts.join("; ")}` : "";
+};
+/** "Name <email>", or the name alone when the source has no addresses (WhatsApp, EzyChat). */
 const person = (p: { name: string; email: string }) => p.email ? `${p.name} <${p.email}>` : p.name;
 
 export function buildPrompt(thread: Thread, owner: PromptOwner = {}): string {
@@ -84,7 +92,7 @@ export function buildPrompt(thread: Thread, owner: PromptOwner = {}): string {
     source === "meeting" ? `### Meeting record ${i + 1}` : `### Message ${i + 1} (${m.folder === "sentitems" ? `sent by ${who}` : "received"})`,
     `Date: ${m.at}`,
     `From: ${person(m.from)}`,
-    m.to.length || source !== "whatsapp" ? `To: ${m.to.map(person).join(", ")}` : "",
+    m.to.length || (source !== "whatsapp" && source !== "ezychat") ? `To: ${m.to.map(person).join(", ")}` : "",
     m.cc.length ? `Cc: ${m.cc.map(person).join(", ")}` : "",
     `Subject: ${m.subject}`,
     "",
@@ -96,7 +104,7 @@ export function buildPrompt(thread: Thread, owner: PromptOwner = {}): string {
   const existing = thread.existingNote ? `\n\n## Existing note for this thread\n\n${thread.existingNote}` : "";
   const project = thread.items.find(i => i.project)?.project, account = thread.items.find(i => i.account)?.account;
   const app = source === "chatgpt-chat" ? "ChatGPT" : source === "gmail" ? "Gmail" : "Claude";
-  return `Source: ${sourceLabel(source, who)}${account ? `\n${app} account: ${account.label}` : ""}${project ? `\n${app} project: ${project.name}` : ""}\n\n## New messages in the thread\n\n${msgs.join("\n\n")}${existing}`;
+  return `Source: ${sourceLabel(source, who)}${ezychatLine(thread)}${account ? `\n${app} account: ${account.label}` : ""}${project ? `\n${app} project: ${project.name}` : ""}\n\n## New messages in the thread\n\n${msgs.join("\n\n")}${existing}`;
 }
 
 /** Validates the parts of the shape later stages rely on. Throws on bad output. */

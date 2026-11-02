@@ -30,9 +30,11 @@ export interface Item {
   account?: { id: string; label: string };
   /** Gmail: `<uidValidity>:<uid>` of the message in All Mail, so its attachments can be read when the thread is extracted. */
   ref?: string;
+  /** EzyChat: the chat's state when read (status, assigned team member, labels, inbox), for the note writer's prompt. */
+  ezychat?: { status: string | null; assignedTo: string | null; tags: string[]; inbox: string | null };
 }
 
-export type Source = "email" | "teams-chat" | "teams-channel" | "meeting" | "ai-chat" | "chatgpt-chat" | "gmail" | "whatsapp";
+export type Source = "email" | "teams-chat" | "teams-channel" | "meeting" | "ai-chat" | "chatgpt-chat" | "gmail" | "whatsapp" | "ezychat";
 
 export interface Dropped {
   item: Item;

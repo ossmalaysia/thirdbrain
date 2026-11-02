@@ -55,9 +55,10 @@ export function sourceOf(line: { source?: string; thread?: string }): string {
   if (s === "meeting" || t.startsWith("meeting:")) return "meeting";
   if (s === "gmail" || t.startsWith("gmail:")) return "gmail";
   if (s === "whatsapp" || t.startsWith("whatsapp:")) return "whatsapp";
+  if (s === "ezychat" || t.startsWith("ezychat:")) return "ezychat";
   return "email";
 }
-export const SOURCE_LABEL: Record<string, string> = { email: "Email", "teams-chat": "Teams chats", "teams-channel": "Teams channels", meeting: "Meetings", "ai-chat": "Claude chats", "chatgpt-chat": "ChatGPT chats", gmail: "Gmail", whatsapp: "WhatsApp" };
+export const SOURCE_LABEL: Record<string, string> = { email: "Email", "teams-chat": "Teams chats", "teams-channel": "Teams channels", meeting: "Meetings", "ai-chat": "Claude chats", "chatgpt-chat": "ChatGPT chats", gmail: "Gmail", whatsapp: "WhatsApp", ezychat: "EzyChat" };
 
 const dayOf = (at: string) => String(at).slice(0, 10);
 const addDays = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86400_000).toISOString().slice(0, 10);

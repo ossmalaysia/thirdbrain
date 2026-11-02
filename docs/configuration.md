@@ -20,12 +20,18 @@ somewhere else.
 ## Portal port
 
 The portal answers on `http://127.0.0.1:58432`. Set the environment variable `THIRDBRAIN_PORT` (1024 to 65535) to
-use another port, for example for a second install. The Microsoft sign-in and the tunnel follow it; the desktop app
-needs `THIRDBRAIN_URL` set to the same address.
+use another port, for example for a second install. The Microsoft and EzyChat sign-ins and the tunnel follow it; the
+desktop app needs `THIRDBRAIN_URL` set to the same address.
 
 Files the portal keeps there include `gmail.json` (the Gmail address and app password, encrypted; see
-[operations.md](operations.md#gmail) for how to create the app password) and `owner-identity.json` (addresses that
-count as the owner besides `owner.emails`, e.g. a connected Gmail address).
+[operations.md](operations.md#gmail) for how to create the app password), `ezychat.json` (the EzyChat address, the
+registered app and the token EzyChat issued at sign-in, encrypted; Disconnect deletes it) and `owner-identity.json`
+(addresses that count as the owner besides `owner.emails`, e.g. a connected Gmail address).
+
+The EzyChat address is the one EzyChat shows under Settings -> Integrations, with or without `/mcp`
+(`https://inbox.example.com` and `https://inbox.example.com/mcp` are the same). It must be `https://`, or `http://`
+on this computer (`localhost`, `127.0.0.1`): EzyChat answers only on its own computer or through its tunnel. Its
+sign-in returns to `http://localhost:<portal port>/ezychat/callback`.
 
 ## config.json
 

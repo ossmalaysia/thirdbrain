@@ -19,6 +19,8 @@ import { GMAIL_FEED, GmailError } from "./adapters/gmail-imap.ts";
 import { createGmailService, type GmailService } from "./gmail.ts";
 import { createWhatsAppService, type WhatsAppService } from "./whatsapp.ts";
 import { WHATSAPP_FEED } from "./adapters/whatsapp-feed.ts";
+import { EZYCHAT_FEED, EzyChatError } from "./adapters/ezychat.ts";
+import { createEzyChatService, EzyChatSignInMismatch, type EzyChatService } from "./ezychat.ts";
 import { RANGES, savePrices, usageReport, rangeStart, type Range } from "./usage.ts";
 import { createDream, type Dream } from "./dream.ts";
 import { automaticDecisions, createEntityIndex, createMergeApplier, ENTITY_KINDS, recordDistinct, recordMerge, undoMerge, type EntityIndex } from "./entities-view.ts";
@@ -67,6 +69,8 @@ export interface PortalDeps {
   gmail?: Pick<GmailService, "status" | "connect" | "disconnect"> & Partial<Pick<GmailService, "setScope" | "counts" | "estimate">>;
   /** WhatsApp linked device: status, QR code while linking, chat choices, disconnect (all laptop only but the status). */
   whatsapp?: Pick<WhatsAppService, "status" | "connect" | "cancelLink" | "disconnect" | "qrSvg" | "chats" | "setChats"> & Partial<Pick<WhatsAppService, "start" | "stop">>;
+  /** EzyChat over its MCP sign-in: status (address and last check, never the token), Connect, callback, Test, Disconnect. */
+  ezychat?: Pick<EzyChatService, "status" | "begin" | "finish" | "test" | "disconnect">;
   /** New releases on GitHub (cached; checked 6-hourly in the background) and the laptop-only self-update. */
   updates?: Pick<Updates, "status" | "check" | "apply">;
 }
@@ -130,6 +134,7 @@ const deps: PortalDeps = {
     const p = Bun.spawn([process.execPath, join(import.meta.dir, "cli.ts"), "whatsapp-unlink"], { cwd: join(import.meta.dir, ".."), stdout: "ignore", stderr: "ignore", stdin: "ignore", windowsHide: true });
     return (await p.exited) === 0;
   } }),
+  ezychat: createEzyChatService(),
   backfill: { windows: () => readWindows(), set: (feed, days) => setWindow(feed, days, loadConfig()), estimate: feed => estimator.estimate(feed), reset: feed => estimator.reset(feed) },
   feedSchedule: { read: () => readSchedule(), set: saveInterval },
   usage: { report: range => usageReport(readLogLines(logsDir, rangeStart(range) ?? ""), loadState(), loadConfig(), range), savePrices: prices => { savePrices(prices); } },
@@ -262,6 +267,7 @@ const confirmPage = (product: string, token: string) => new Response(
 export function createPortal(port = portalPort(), services: PortalDeps = deps) {
   const control = randomBytes(32).toString("hex");
   const redirectUri = `http://localhost:${port}/`;
+  const ezychatRedirect = `http://localhost:${port}/ezychat/callback`; // loopback: EzyChat accepts http only there
   let pending: { auth: ReturnType<typeof makeAuthorization>; cfg: Config; expires: number } | null = null;
   let exchanging = false;
   let notice = "";
@@ -279,8 +285,9 @@ export function createPortal(port = portalPort(), services: PortalDeps = deps) {
   const shellFile = (path: string) => new Response(Bun.file(join(assets, path.slice(1))), { headers: { ...headers, "content-type": SHELL[path],
     ...(path === "/sw.js" ? { "cache-control": "no-cache" } : {}) } });
   const sessions = services.sessions ?? createSessions();
-  // Feeds that take a history window: every Claude.ai account's feed, ChatGPT, Gmail and WhatsApp.
-  const windowFeeds = () => [...(services.claude?.list() ?? []).map(a => a.feed), CHATGPT_FEED, ...(services.gmail ? [GMAIL_FEED] : []), ...(services.whatsapp ? [WHATSAPP_FEED] : [])];
+  // Feeds that take a history window: every Claude.ai account's feed, ChatGPT, Gmail, WhatsApp and EzyChat.
+  const windowFeeds = () => [...(services.claude?.list() ?? []).map(a => a.feed), CHATGPT_FEED, ...(services.gmail ? [GMAIL_FEED] : []), ...(services.whatsapp ? [WHATSAPP_FEED] : []),
+    ...(services.ezychat ? [EZYCHAT_FEED] : [])];
   const windowSummary = () => {
     if (!services.backfill) return null;
     const cfg = services.config(), w = services.backfill.windows();
@@ -329,7 +336,7 @@ export function createPortal(port = portalPort(), services: PortalDeps = deps) {
     try {
       if (req.method === "GET") {
         if (url.pathname === "/api/status") return json({ ...publicStatus(services.config(), services.state(), services.connected(), services.running(), await schedule(), intervals(), services.signedInAt?.() ?? null),
-          runs: limitRuns(services.history?.() ?? { total: 0, succeeded: 0, failed: 0, skipped: 0, entries: [] }), backup: await backup(), ai: await services.ai?.status() ?? null, remote: services.remote ? withoutLogs({ ...services.remote.status(), devices: sessions.count() }, isPublic) : null, claude: services.claude?.status() ?? null, claudeAccounts: services.claude?.list() ?? [], gmail: services.gmail?.status() ?? null, whatsapp: services.whatsapp?.status() ?? null, dream: services.dream?.status() ?? null, chatgptChats: { enabled: chatgptChatsEnabled() }, updates: publicUpdates(services.updates?.status() ?? null, isPublic), backfill: windowSummary(), vault: basename(services.config().brainPath), notice, ...identity(appInfo()) });
+          runs: limitRuns(services.history?.() ?? { total: 0, succeeded: 0, failed: 0, skipped: 0, entries: [] }), backup: await backup(), ai: await services.ai?.status() ?? null, remote: services.remote ? withoutLogs({ ...services.remote.status(), devices: sessions.count() }, isPublic) : null, claude: services.claude?.status() ?? null, claudeAccounts: services.claude?.list() ?? [], gmail: services.gmail?.status() ?? null, whatsapp: services.whatsapp?.status() ?? null, ezychat: services.ezychat?.status() ?? null, dream: services.dream?.status() ?? null, chatgptChats: { enabled: chatgptChatsEnabled() }, updates: publicUpdates(services.updates?.status() ?? null, isPublic), backfill: windowSummary(), vault: basename(services.config().brainPath), notice, ...identity(appInfo()) });
         if (Object.hasOwn(SHELL, url.pathname)) return shellFile(url.pathname);
         // WhatsApp: the QR code reads every chat and the chat list names private chats, so both stay on the laptop.
         if (url.pathname.startsWith("/api/whatsapp/") && services.whatsapp) {
@@ -385,6 +392,17 @@ export function createPortal(port = portalPort(), services: PortalDeps = deps) {
           const file = join(services.config().brainPath, path);
           if (!existsSync(file)) return json({ error: "This note has since been moved or removed from the vault." }, 404);
           return json({ path, content: readFileSync(file, "utf8").slice(0, 200_000) });
+        }
+        if (url.pathname === "/ezychat/callback" && services.ezychat) {
+          // EzyChat's approval page returns here (loopback redirect): laptop only, one try per sign-in, and the code
+          // leaves the address bar at once.
+          if (isPublic) return json({ error: "Not found" }, 404);
+          try { notice = (await services.ezychat.finish(url.searchParams)).message; }
+          catch (e) {
+            if (e instanceof EzyChatSignInMismatch) return json({ error: e.message }, 400);
+            notice = e instanceof Error ? e.message : "EzyChat could not finish the sign-in. Connect again.";
+          }
+          return new Response(null, { status: 302, headers: { ...headers, location: "/#/connectors/ezychat" } });
         }
         if (url.pathname !== "/") return json({ error: "Not found" }, 404);
         if (url.searchParams.has("error")) {
@@ -505,6 +523,27 @@ export function createPortal(port = portalPort(), services: PortalDeps = deps) {
         if (url.pathname === "/api/gmail/disconnect") {
           services.gmail.disconnect();
           return json({ message: "Gmail disconnected and its app password deleted from this computer. Existing notes stay in your brain." });
+        }
+        return json({ error: "Not found" }, 404);
+      }
+      if (url.pathname.startsWith("/api/ezychat/") && services.ezychat) { // laptop only (not in PUBLIC_POSTS): the sign-in returns to localhost
+        if (Number(req.headers.get("content-length") ?? 0) > 4096) return json({ error: "Request too large" }, 413);
+        const body = await req.json().catch(() => ({})) as { address?: unknown; days?: unknown }, e = services.ezychat;
+        // Fixed messages only (adapters/ezychat.ts); the token and EzyChat's own words are never echoed.
+        const failed = (err: unknown) => err instanceof EzyChatError ? json({ error: err.message }, err.code === "address" ? 400 : 502)
+          : json({ error: err instanceof Error ? err.message : "EzyChat could not be reached right now. Try again." }, 400);
+        if (url.pathname === "/api/ezychat/connect") {
+          if (body.days !== undefined && (!isWindowDays(body.days) || !services.backfill)) return json({ error: "Choose 1 month, 6 months, 1 year or 2 years." }, 400);
+          try {
+            const { url: approve } = await e.begin(body.address, ezychatRedirect); // discovery + registration before the browser leaves
+            if (body.days !== undefined) { try { services.backfill!.set(EZYCHAT_FEED, body.days as number); } catch { /* a running sync: the window stays as it was */ } services.backfill!.reset?.(EZYCHAT_FEED); }
+            return json({ url: approve });
+          } catch (err) { return failed(err); }
+        }
+        if (url.pathname === "/api/ezychat/test") { try { return json(await e.test()); } catch (err) { return failed(err); } }
+        if (url.pathname === "/api/ezychat/disconnect") {
+          e.disconnect();
+          return json({ message: "EzyChat disconnected and its token deleted from this computer. Also remove Third Brain under EzyChat Settings -> Integrations -> Connected apps. Existing notes stay in your brain." });
         }
         return json({ error: "Not found" }, 404);
       }
