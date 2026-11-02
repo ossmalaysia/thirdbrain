@@ -43,8 +43,9 @@ export function normalizeBase(raw: unknown): string {
   let u: URL;
   try { u = new URL(text); } catch { throw new EzyChatError("address"); }
   if (!u.hostname || u.username || u.password || !(u.protocol === "https:" || (u.protocol === "http:" && LOOPBACK.has(u.hostname)))) throw new EzyChatError("address");
-  const path = u.pathname.replace(/\/+$/, "").replace(/\/mcp$/i, "").replace(/\/+$/, "");
-  return `${u.origin}${path}`;
+  const parts = u.pathname.split("/").filter(Boolean); // segments, so no backtracking regex on a pasted path
+  if (parts.at(-1)?.toLowerCase() === "mcp") parts.pop();
+  return `${u.origin}${parts.length ? `/${parts.join("/")}` : ""}`;
 }
 
 export interface EzyChatConnection { base: string; token: string }
@@ -138,13 +139,15 @@ function readCursor(raw: string | undefined): Cursor {
 }
 
 class OutOfBudget extends Error {}
+export interface Budget { chats: number; calls: number }
+const RUN_BUDGET: Readonly<Budget> = Object.freeze({ chats: MAX_CHATS_PER_RUN, calls: MAX_CALLS_PER_RUN });
 
 /** One run: the chat list since the last finished pass, each changed chat's messages back to its mark (or the history
  *  window), at most `budget` chats and calls. Marks move only past what was read, so a stopped run continues next time;
  *  a chat whose newest message is not newer than its mark is passed over without a call. A 429 after some progress
  *  keeps that progress; before any, it fails the feed (the portal shows the wait). */
 export async function pullEzyChat(api: EzyChatApi, cursor: string | undefined, owner: Person, since = "",
-  budget: { chats: number; calls: number } = { chats: MAX_CHATS_PER_RUN, calls: MAX_CALLS_PER_RUN }): Promise<{ items: Item[]; next: string }> {
+  budget: Budget = RUN_BUDGET): Promise<{ items: Item[]; next: string }> {
   const c = readCursor(cursor), windowStart = Date.parse(since) || 0, items: Item[] = [];
   // EzyChat lists chats changed strictly after `since`: 1 ms earlier lists a chat at exactly the watermark again
   // (passed over by its mark) rather than missing another chat with the same time.

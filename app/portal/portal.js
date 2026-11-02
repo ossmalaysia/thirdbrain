@@ -791,7 +791,7 @@ function openEzyChatDialog() {
   draw(true);
   dialog.showModal();
   form.elements.address.focus();
-  if (status.ezychat?.connected) fetch('/api/backfill/estimate?feed=ezychat', { cache: 'no-store' })
+  if (status.ezychat?.connected) void fetch('/api/backfill/estimate?feed=ezychat', { cache: 'no-store' })
     .then(async r => { const d = await r.json().catch(() => null); return r.ok && d?.choices ? d : 'unavailable'; }, () => 'unavailable')
     .then(est => { if (seq === ezySeq && dialog.open) { ctx.est = est; draw(false); } });
 }
@@ -1014,7 +1014,7 @@ const ACTIONS = {
   ezychatAdd: () => openEzyChatDialog(),
   ezychatTest: () => post('/api/ezychat/test'),
   ezychatDisconnect: () => {
-    if (confirm('Disconnect EzyChat? The token is deleted from this computer. Also remove Third Brain under EzyChat Settings -> Integrations -> Connected apps. Notes already written stay.')) post('/api/ezychat/disconnect');
+    if (confirm('Disconnect EzyChat? The token is deleted from this computer. Also remove Third Brain under EzyChat Settings -> Integrations -> Connected apps. Notes already written stay.')) void post('/api/ezychat/disconnect');
   },
   gmailDisconnect: () => { if (confirm('Disconnect Gmail? The saved app password is deleted from this computer. Notes already written stay.')) post('/api/gmail/disconnect'); },
   chatgptSignOut: () => post('/api/ai/chatgpt-signout'),
