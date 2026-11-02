@@ -3,8 +3,8 @@ import { branch, chatDocuments, chatItems, enrichChatThread, messageText, pullCl
 import { renderThreadNote } from "../src/core/render.ts";
 import { buildPrompt } from "../src/core/extract.ts";
 import type { Knowledge, Thread } from "../src/types.ts";
-import { browserApi, claudeUrl, ClaudeAuthError, ClaudeBlockedError, FETCH_IN_TAB, signedIn } from "../src/claude-web/session.ts";
-import { findBrowser, launchArgs, onOrigin, pickTab } from "../src/claude-web/cdp.ts";
+import { browserApi, claudeUrl, ClaudeAuthError, ClaudeBlockedError, ClaudeTimeoutError, FETCH_IN_TAB, signedIn } from "../src/claude-web/session.ts";
+import { findBrowser, launchArgs, onOrigin, pickTab, tabError } from "../src/claude-web/cdp.ts";
 
 const ME = { name: "Aisyah Rahman", email: "aisyah@example.com" };
 const msg = (uuid: string, parent: string | undefined, sender: string, text: string, at = "2026-10-15T10:00:00Z", index = 0) =>
@@ -66,6 +66,25 @@ test("pull: a backfill bigger than the per-run budget reads oldest first and fin
     cursor = r.next;
   }
   expect(seen).toEqual(["c1", "c2", "c3", "c4", "c5"]);
+});
+
+test("pull: a chat too large to send in time is read again without tool output, so one long chat cannot stop the feed", async () => {
+  const asked: string[] = [];
+  const api = { get: async (path: string): Promise<any> => {
+    asked.push(path);
+    if (path === "/api/organizations") return [{ uuid: "o" }];
+    if (path.includes("chat_conversations_v2")) return { data: [{ uuid: "huge", updated_at: "2026-10-02T00:00:00Z" }, { uuid: "small", updated_at: "2026-10-01T00:00:00Z" }], has_more: false };
+    const id = path.split("/chat_conversations/")[1].split("?")[0];
+    if (id === "huge" && path.includes("render_all_tools")) throw new ClaudeTimeoutError("Claude.ai did not answer in time.");
+    return { uuid: id, current_leaf_message_uuid: `${id}-m`, chat_messages: [msg(`${id}-m`, undefined, "human", `text ${id}`)] };
+  } };
+  const r = await pullClaudeChats(api, undefined, "2026-09-01T00:00:00Z", ME);
+  expect(r.items.map(i => i.threadId)).toEqual(["ai-claude:small", "ai-claude:huge"]);
+  expect(asked).toContain("/api/organizations/o/chat_conversations/huge?tree=True&rendering_mode=messages");
+  expect(asked.filter(p => p.includes("/small?"))).toEqual(["/api/organizations/o/chat_conversations/small?tree=True&rendering_mode=messages&render_all_tools=true"]);
+  // Any other failure still ends the feed for this run, as before.
+  const broken = { get: async (path: string): Promise<any> => path.includes("/chat_conversations/") ? Promise.reject(new ClaudeAuthError("signed out")) : api.get(path) };
+  await expect(pullClaudeChats(broken, undefined, "2026-09-01T00:00:00Z", ME)).rejects.toBeInstanceOf(ClaudeAuthError);
 });
 
 test("pull: API-only organisations are skipped (they answer 403, which would read as signed out)", async () => {
@@ -210,6 +229,15 @@ test("in-tab requests: host guard, signed out, Cloudflare challenge", async () =
   expect(await api({ status: 200, body: '[{"uuid":"o"}]' }).get("/api/organizations")).toEqual([{ uuid: "o" }]);
   expect(await signedIn(api({ status: 200, body: "[]" }))).toBe(false);
   expect(await signedIn(api({ status: 200, body: '[{"uuid":"o"}]' }))).toBe(true);
+  // A request that runs out of time is its own error, not "Uncaught (in promise)" from the tab.
+  expect(FETCH_IN_TAB).toContain('e?.name === "TimeoutError"');
+  await expect(api({ status: 0, timedOut: true }).get("/api/x")).rejects.toBeInstanceOf(ClaudeTimeoutError);
+});
+
+test("tab errors: the exception's own message, not only DevTools' 'Uncaught (in promise)'", () => {
+  expect(tabError({ text: "Uncaught (in promise)", exception: { description: "TypeError: Failed to fetch\n    at <anonymous>:3:19" } })).toBe("TypeError: Failed to fetch");
+  expect(tabError({ text: "Uncaught (in promise)" })).toBe("Uncaught (in promise)");
+  expect(tabError({})).toBe("error");
 });
 
 test("browser launch: headed with automation markers off and its own profile (claude-sync flags)", () => {

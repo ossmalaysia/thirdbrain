@@ -3,7 +3,7 @@
 // (claude-sync skips unchanged chats the same way). The pipeline's id + fingerprint dedupe means only
 // new messages of a changed chat reach the AI.
 import type { Item, Person, Thread } from "../types.ts";
-import type { ClaudeApi } from "../claude-web/session.ts";
+import { ClaudeTimeoutError, type ClaudeApi } from "../claude-web/session.ts";
 import { textAttachment, type AttachmentInfo } from "../core/attachments.ts";
 
 export const AI_FEED = "ai:claude";
@@ -108,6 +108,14 @@ export function chatDocuments(c: ChatDetail, fromIso: string): AttachmentInfo[] 
   });
 }
 
+/** One chat with its tool calls (they hold the documents Claude wrote). A chat too large for Claude.ai to send in
+ *  time (20 MB, 50-100 s, 2026-11-02) is read again without them: its messages still become a note. */
+async function chatDetail(api: ClaudeApi, org: string, conv: string): Promise<ChatDetail> {
+  const path = `/api/organizations/${org}/chat_conversations/${conv}?tree=True&rendering_mode=messages`;
+  try { return await api.get<ChatDetail>(`${path}&render_all_tools=true`); }
+  catch (e) { if (!(e instanceof ClaudeTimeoutError)) throw e; return api.get<ChatDetail>(path); }
+}
+
 /** Pipeline enrich step for Claude.ai threads: re-reads the chat (documents are never kept in the queue). */
 export async function enrichChatThread(api: ClaudeApi, thread: Thread): Promise<void> {
   const first = thread.items[0];
@@ -116,7 +124,7 @@ export async function enrichChatThread(api: ClaudeApi, thread: Thread): Promise<
   const orgs = (await api.get<{ uuid?: string; capabilities?: string[] }[]>("/api/organizations"))
     .filter(o => o.uuid && (!o.capabilities || o.capabilities.includes("chat")));
   for (const org of orgs) {
-    const detail = await api.get<ChatDetail>(`/api/organizations/${org.uuid}/chat_conversations/${conv}?tree=True&rendering_mode=messages&render_all_tools=true`).catch(() => null);
+    const detail = await chatDetail(api, org.uuid!, conv).catch(() => null);
     if (!detail?.chat_messages) continue;
     const docs = chatDocuments(detail, thread.items.map(i => i.at).sort()[0]);
     if (docs.length) thread.items[thread.items.length - 1].attachments = docs;
@@ -150,7 +158,7 @@ export async function pullClaudeChats(api: ClaudeApi, cursor: string | undefined
     changed.sort((a, b) => String(a.updated_at).localeCompare(String(b.updated_at)));
     let newest = since;
     for (const c of changed.slice(0, budget)) {
-      const detail = await api.get<ChatDetail>(`/api/organizations/${org.uuid}/chat_conversations/${c.uuid}?tree=True&rendering_mode=messages&render_all_tools=true`);
+      const detail = await chatDetail(api, org.uuid!, c.uuid);
       items.push(...chatItems({ ...c, ...detail }, me, sinceIso, account));
       if (String(c.updated_at) > newest) newest = String(c.updated_at);
       budget--;

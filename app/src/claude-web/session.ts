@@ -11,8 +11,13 @@ export const CLAUDE_ORIGIN = "https://claude.ai";
  *  elsewhere (e.g. an SSO sign-in page). */
 export const FETCH_IN_TAB = `async function (url) {
   if (location.host !== "claude.ai") return { status: 0, host: location.host };
-  const r = await fetch(url, { credentials: "include", signal: AbortSignal.timeout(45000) });
-  return { status: r.status, body: await r.text() };
+  try {
+    const r = await fetch(url, { credentials: "include", signal: AbortSignal.timeout(45000) });
+    return { status: r.status, body: await r.text() };
+  } catch (e) {
+    if (e?.name === "TimeoutError") return { status: 0, timedOut: true };
+    throw e;
+  }
 }`;
 
 /** The absolute URL of a Claude.ai API path. Throws unless it stays on the Claude.ai origin. */
@@ -27,6 +32,8 @@ type InTab = <T>(port: number, fn: string, args: unknown[]) => Promise<T>;
 
 export class ClaudeAuthError extends Error {}
 export class ClaudeBlockedError extends Error {}
+/** Claude.ai took longer than the in-tab limit (seen with a 20 MB chat on 2026-11-02). */
+export class ClaudeTimeoutError extends Error {}
 
 export interface ClaudeApi { get: <T = any>(path: string) => Promise<T> }
 
@@ -34,7 +41,8 @@ export interface ClaudeApi { get: <T = any>(path: string) => Promise<T> }
 export function browserApi(port: number, run: InTab = callInTab): ClaudeApi {
   return {
     async get<T>(path: string): Promise<T> {
-      const r = await run<{ status: number; body?: string; host?: string }>(port, FETCH_IN_TAB, [claudeUrl(path)]);
+      const r = await run<{ status: number; body?: string; host?: string; timedOut?: boolean }>(port, FETCH_IN_TAB, [claudeUrl(path)]);
+      if (r.timedOut) throw new ClaudeTimeoutError("Claude.ai did not answer within 45 seconds.");
       if (r.host) throw new ClaudeAuthError(`Claude.ai is not signed in (the tab is on ${r.host}). Use Reconnect Claude.ai in the portal.`);
       if (r.status === 401 || r.status === 403) {
         if (/challenge|cf-chl|Just a moment/i.test(r.body ?? "")) throw new ClaudeBlockedError("Cloudflare is challenging the Claude.ai browser. Open it from the portal and complete the check.");

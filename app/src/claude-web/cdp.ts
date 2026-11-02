@@ -87,6 +87,13 @@ export async function claudeTab(port: number, origin = "https://claude.ai"): Pro
   return await created.json() as Target;
 }
 
+export interface ExceptionDetails { text?: string; exception?: { description?: string } }
+
+/** The exception's first line ("TypeError: Failed to fetch"); DevTools' `text` alone is only "Uncaught (in promise)". */
+export function tabError(d: ExceptionDetails): string {
+  return d.exception?.description?.split("\n")[0] || d.text || "error";
+}
+
 /** Calls `fn` (the source of a function, a fixed constant: never built from data) in the tab with `args` as
  *  its arguments, awaiting a promise, and returns its JSON value. The arguments travel as DevTools values
  *  (Runtime.callFunctionOn), so no data is ever turned into code. The minimised tab is marked active and
@@ -103,7 +110,7 @@ export async function callInTab<T>(port: number, fn: string, args: unknown[] = [
     // The page's global object is the `this` of the call; asked again after a reload (the old one is gone).
     const global = await conn.send<{ result: { objectId?: string } }>("Runtime.evaluate", { expression: "globalThis" }, timeoutMs);
     if (!global.result.objectId) throw new Error("the claude.ai tab has no page to run in");
-    return conn.send<{ result: { value: T }; exceptionDetails?: { text?: string } }>("Runtime.callFunctionOn",
+    return conn.send<{ result: { value: T }; exceptionDetails?: ExceptionDetails }>("Runtime.callFunctionOn",
       { objectId: global.result.objectId, functionDeclaration: fn, arguments: args.map(value => ({ value })), awaitPromise: true, returnByValue: true }, timeoutMs);
   };
   try {
@@ -121,7 +128,7 @@ export async function callInTab<T>(port: number, fn: string, args: unknown[] = [
       await wake();
       r = await run();
     }
-    if (r.exceptionDetails) throw new Error(`script failed in the claude.ai tab: ${r.exceptionDetails.text ?? "error"}`);
+    if (r.exceptionDetails) throw new Error(`script failed in the claude.ai tab: ${tabError(r.exceptionDetails)}`);
     return r.result.value;
   } finally { conn.close(); }
 }
