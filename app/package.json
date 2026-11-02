@@ -13,7 +13,7 @@
     "@anthropic-ai/sdk": "0.135.0",
     "baileys": "7.0.0-rc14",
     "fflate": "^0.8.3",
-    "imapflow": "2.4.3",
+    "imapflow": "2.5.7",
     "mailparser": "3.9.36",
     "openai": "7.34.0",
     "qrcode": "1.5.4",
