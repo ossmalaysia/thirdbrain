@@ -404,5 +404,13 @@ describe("view", () => {
     expect(m.title).toBe("How far back should EzyChat chats go?");
     expect(m.selected).toBe(30);
     expect(m.choices[0].line).toBe("Counting chats…");
+    // Before the sign-in the server answers without counts: per-chat figures, not "Counting chats…" for ever.
+    const uncounted = { counted: false, perChat: { in: 8000, out: 400, source: "default" }, threadsPerRun: 25, writer: { provider: "codex" },
+      choices: [30, 182, 365, 730].map(days => ({ days, chats: null, approximate: false, inputTokens: null, hours: null })) };
+    const before = windowDialogModel({ est: uncounted, status: { ...base, ezychat: { connected: false } }, feed: "ezychat", mode: "add", claude: false });
+    expect(before.choices[0].line).toBe("≈ 8.0 k tokens in and 400 out per chat");
+    expect(before.notes.join(" ")).toContain("Chat counts appear once EzyChat is connected");
+    const reconnect = windowDialogModel({ est: null, status: { ...base, ezychat: { connected: true } }, feed: "ezychat", mode: "add", claude: false });
+    expect(reconnect.notes.join(" ")).not.toContain("once EzyChat is connected");
   });
 });

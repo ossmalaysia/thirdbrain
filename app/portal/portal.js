@@ -787,11 +787,13 @@ function openEzyChatDialog() {
     else for (const c of m.choices) box.querySelector(`[data-line="${c.days}"]`).textContent = c.line;
   };
   form.reset(); $('#ezychat-error').hidden = true;
+  $('#ezychat-title').textContent = status.ezychat?.connected ? 'Reconnect EzyChat' : 'Add EzyChat';
   if (status.ezychat?.address) form.elements.address.value = status.ezychat.address;
   draw(true);
   dialog.showModal();
   form.elements.address.focus();
-  if (status.ezychat?.connected) void fetch('/api/backfill/estimate?feed=ezychat', { cache: 'no-store' })
+  // Asked also before the sign-in (like Gmail): the server then answers without counts, so the choices show per-chat figures.
+  fetch('/api/backfill/estimate?feed=ezychat', { cache: 'no-store' })
     .then(async r => { const d = await r.json().catch(() => null); return r.ok && d?.choices ? d : 'unavailable'; }, () => 'unavailable')
     .then(est => { if (seq === ezySeq && dialog.open) { ctx.est = est; draw(false); } });
 }

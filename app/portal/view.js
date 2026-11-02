@@ -762,7 +762,7 @@ export function windowDialogModel({ est, status, feed, mode, current, claude }) 
   else if (claude && (mode === 'add' || (loaded && !est.counted))) notes.push('Chat counts appear once this account is signed in; until then each choice shows the cost per chat.');
   else if (est === 'unavailable') notes.push(`${gmail ? 'Thread' : 'Chat'} counts appear after the portal restarts; until then each choice shows the cost per ${one}.`);
   if (wa) notes.push('Counts cover the chats that become notes now, and only the history the phone sent at linking.');
-  if (ezy) notes.push(mode === 'add' ? 'Chat counts appear once EzyChat is connected. Each chat makes one note per month with messages.' : 'Each chat makes one note per month with messages.');
+  if (ezy) notes.push(status?.ezychat?.connected ? 'Each chat makes one note per month with messages.' : 'Chat counts appear once EzyChat is connected. Each chat makes one note per month with messages.');
   if (loaded && est.perChat.source === 'default') notes.push(`Per-${one} figures are a typical measurement; they become your own after a few runs.`);
   if (loaded && est.counted && est.choices.some(c => c.approximate)) notes.push(`Counts marked ≈ are estimated from your most recent ${many}.`);
   notes.push(`Time assumes ${number(threadsPerRun)} conversations per run, one run every 15 minutes, shared with your other connectors.`);

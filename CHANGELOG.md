@@ -3,6 +3,12 @@
 All notable changes to Third Brain. Versions follow [semantic versioning](https://semver.org/). The app version is
 `version` in `app/package.json`; the desktop app (`desktop/package.json`) keeps the same number.
 
+## 0.1.8 - 2026-11-03
+
+- **EzyChat:** the **Add EzyChat** dialog no longer shows "Counting chats..." for ever before EzyChat is connected.
+  Until the sign-in, each history choice shows the cost per chat, as in the Gmail dialog. When EzyChat is already
+  connected, the dialog is called **Reconnect EzyChat**.
+
 ## 0.1.7 - 2026-11-03
 
 - **EzyChat connector:** the customer chats of an EzyChat team inbox (Lite or Enterprise, any number of inboxes)
