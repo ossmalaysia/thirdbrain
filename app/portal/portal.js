@@ -793,7 +793,7 @@ function openEzyChatDialog() {
   dialog.showModal();
   form.elements.address.focus();
   // Asked also before the sign-in (like Gmail): the server then answers without counts, so the choices show per-chat figures.
-  fetch('/api/backfill/estimate?feed=ezychat', { cache: 'no-store' })
+  void fetch('/api/backfill/estimate?feed=ezychat', { cache: 'no-store' })
     .then(async r => { const d = await r.json().catch(() => null); return r.ok && d?.choices ? d : 'unavailable'; }, () => 'unavailable')
     .then(est => { if (seq === ezySeq && dialog.open) { ctx.est = est; draw(false); } });
 }
