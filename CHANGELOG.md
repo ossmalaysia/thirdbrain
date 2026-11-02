@@ -5,6 +5,8 @@ All notable changes to Third Brain. Versions follow [semantic versioning](https:
 
 ## Unreleased
 
+## 0.1.6 - 2026-11-02
+
 - **Claude.ai:** one very long chat no longer stops the whole account. A chat that Claude.ai cannot send within
   45 seconds (a 20 MB chat took 50-100 seconds) is read again without the tool output, so its messages still become
   a note; only the documents that Claude wrote in that chat are left out. Errors from the claude.ai tab now show the
