@@ -12,6 +12,7 @@ import { chatgptChatsEnabled, setChatgptChats } from "./chatgpt-chats.ts";
 import { createSessions, readCookie, SESSION_COOKIE, SESSION_TTL_MS, type Sessions } from "./remote/sessions.ts";
 import { NOTE_SOURCES, notesIndexFor, parseNotesQuery, queryNotes } from "./notes-index.ts";
 import { PROVIDERS } from "./core/providers.ts";
+import { OWNED_DIRS } from "./core/commit.ts";
 import { createEstimator, perChatFromLogs, sinceIso, windowCost, writerOf, feedWindowDays, isWindowDays, readLogLines, readWindows, setWindow, WindowBusyError, type Windows } from "./backfill.ts";
 import { liveSample } from "./backfill-live.ts";
 import { CHATGPT_FEED } from "./adapters/chatgpt-web.ts";
@@ -386,9 +387,9 @@ export function createPortal(port = portalPort(), services: PortalDeps = deps) {
           return json({ error: "Not found" }, 404);
         }
         if (url.pathname === "/api/note") {
-          // Only notes in the connector's own folders (email, Teams, meetings); never other vault files.
+          // Only notes in the connector's own folders (OWNED_DIRS); never other vault files.
           const path = url.searchParams.get("path") ?? "";
-          if (!/^inbox\/(email|teams|meetings|ai)\/[\w./-]+\.md$/.test(path) || path.split("/").includes("..")) return json({ error: "That is not a synced note." }, 404);
+          if (!/^inbox\/[\w./-]+\.md$/.test(path) || !OWNED_DIRS.some(dir => path.startsWith(`${dir}/`)) || path.split("/").includes("..")) return json({ error: "That is not a synced note." }, 404);
           const file = join(services.config().brainPath, path);
           if (!existsSync(file)) return json({ error: "This note has since been moved or removed from the vault." }, 404);
           return json({ path, content: readFileSync(file, "utf8").slice(0, 200_000) });

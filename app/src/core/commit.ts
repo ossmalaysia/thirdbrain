@@ -37,8 +37,9 @@ export function porcelainPath(line: string): string {
   return (p.includes(" -> ") ? p.slice(p.lastIndexOf(" -> ") + 4) : p).replace(/^"|"$/g, "");
 }
 
-/** Folders this connector writes and commits: email, Teams (chats + channels) and meetings. */
-export const OWNED_DIRS = ["inbox/email", "inbox/teams", "inbox/meetings", "inbox/ai"];
+/** Folders this connector writes and commits: email, Teams (chats + channels), meetings, AI chats, WhatsApp and
+ *  EzyChat. Every SOURCE_STYLE folder must sit under one of these, or its notes are never committed or indexed. */
+export const OWNED_DIRS = ["inbox/email", "inbox/teams", "inbox/meetings", "inbox/ai", "inbox/whatsapp", "inbox/ezychat"];
 export const OWNED_DIR = OWNED_DIRS[0];
 /** Committed as well: the entity pages the sync keeps (core/entities.ts). Not a note folder. */
 export const COMMIT_DIRS = [...OWNED_DIRS, ENTITY_DIR];
