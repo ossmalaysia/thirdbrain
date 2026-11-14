@@ -3,6 +3,13 @@
 All notable changes to Third Brain. Versions follow [semantic versioning](https://semver.org/). The app version is
 `version` in `app/package.json`; the desktop app (`desktop/package.json`) keeps the same number.
 
+## 0.1.9 - 2026-11-14
+
+- **EzyChat and WhatsApp:** their notes now reach the brain. The sync wrote them but never committed or indexed
+  `inbox/ezychat/` and `inbox/whatsapp/`, so `recall` could not find them and a later run started a new note
+  instead of updating the chat's own. Notes already written are committed and indexed on the next run.
+- **Portal:** opening an EzyChat or WhatsApp note from **Sync runs** no longer shows "That is not a synced note."
+
 ## 0.1.8 - 2026-11-03
 
 - **EzyChat:** the **Add EzyChat** dialog no longer shows "Counting chats..." for ever before EzyChat is connected.

@@ -2,7 +2,8 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { commitAndIndex, porcelainPath } from "../src/core/commit.ts";
+import { commitAndIndex, OWNED_DIRS, porcelainPath } from "../src/core/commit.ts";
+import { SOURCE_STYLE } from "../src/core/render.ts";
 
 test("real git commits only mail notes and failed indexing retries after a clean commit", () => {
   const root = mkdtempSync(join(tmpdir(), "mailsync-commit-"));
@@ -70,4 +71,9 @@ test("commit: a changed note as the only change is committed (the trimmed first 
   expect(commitAndIndex("D:/vault", [], execute as any, [])).toMatchObject({ committed: true });
   expect(calls.find(c => c[1] === "add")).toEqual(["git", "add", "--", "inbox/ai"]);
   expect(calls.find(c => c[1] === "commit")?.slice(-2)).toEqual(["--", "inbox/ai"]);
+});
+
+test("every source's note folder is committed and indexed (WhatsApp and EzyChat notes were left out)", () => {
+  for (const [source, style] of Object.entries(SOURCE_STYLE))
+    expect([source, OWNED_DIRS.some(dir => style.dir.startsWith(`${dir}/`) || style.dir === dir)]).toEqual([source, true]);
 });
